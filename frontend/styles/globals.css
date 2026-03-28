@@ -1,0 +1,44 @@
+/* Глобальные стили */
+:root {
+  --bs-primary: #0d6efd;
+  --bs-secondary: #6c757d;
+  --bs-success: #198754;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Hover-эффект для карточек */
+.hover-shadow {
+  transition: box-shadow 0.3s ease, transform 0.3s ease;
+}
+
+.hover-shadow:hover {
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
+}
+
+/* Адаптивные изображения */
+.card-img-top {
+  aspect-ratio: 1 / 1;
+  object-fit: contain;
+}
+
+/* Бейджи статусов */
+.badge {
+  font-weight: 500;
+}
+
+/* Хлебные крошки */
+.breadcrumb {
+  background: transparent;
+  padding: 0;
+  margin-bottom: 1rem;
+}
+
+/* Кнопки */
+.btn-lg {
+  padding: 0.75rem 1.5rem;
+  font-weight: 600;
+}
