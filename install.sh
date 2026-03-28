@@ -106,29 +106,29 @@ info "Создание БД..."
 sudo -u postgres psql -v ON_ERROR_STOP=0 << PSQL
 DO \$\$
 BEGIN
-  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='taxiuser') THEN
-    CREATE USER taxiuser WITH PASSWORD '${DB_PASS}' CREATEDB;
+  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='lemanuser') THEN
+    CREATE USER lemanuser WITH PASSWORD '${DB_PASS}' CREATEDB;
   ELSE
-    ALTER USER taxiuser WITH PASSWORD '${DB_PASS}';
+    ALTER USER lemanuser WITH PASSWORD '${DB_PASS}';
   END IF;
 END\$\$;
 
-SELECT 'CREATE DATABASE taxirating
-  OWNER taxiuser
+SELECT 'CREATE DATABASE lemanddbb
+  OWNER lemanuser
   ENCODING ''UTF8''
   TEMPLATE template0'
 WHERE NOT EXISTS (
-  SELECT FROM pg_database WHERE datname='taxirating'
+  SELECT FROM pg_database WHERE datname='lemanddbb'
 )\gexec
 
-GRANT ALL PRIVILEGES ON DATABASE taxirating TO taxiuser;
-\c taxirating
+GRANT ALL PRIVILEGES ON DATABASE lemanddbb TO lemanuser;
+\c lemanddbb
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 CREATE EXTENSION IF NOT EXISTS unaccent;
 
 PSQL
 
-ok "БД taxirating создана"
+ok "БД lemanddbb создана"
 
 # ── Redis ─────────────────────────────────────
 step "Redis"
@@ -172,7 +172,7 @@ if [ -d "$PROJECT_DIR/.git" ]; then
     git pull origin main
 else
     info "Клонируем репозиторий..."
-    git clone https://github.com/tech1and/lem.git "$PROJECT_DIR"
+    git clone https://github.com/tech1and/lemanas.git "$PROJECT_DIR"
     cd "$PROJECT_DIR"
 fi
 
@@ -203,8 +203,8 @@ SECRET_KEY=${SECRET_KEY}
 DEBUG=False
 ALLOWED_HOSTS=localhost,127.0.0.1,${DOMAIN}
 
-DB_NAME=taxirating
-DB_USER=taxiuser
+DB_NAME=lemanddbb
+DB_USER=lemanuser
 DB_PASSWORD=${DB_PASS}
 DB_HOST=127.0.0.1
 DB_PORT=5432
@@ -212,6 +212,7 @@ DB_PORT=5432
 REDIS_URL=redis://127.0.0.1:6379/1
 
 CORS_ALLOWED_ORIGINS=http://localhost:3000,http://${DOMAIN},https://${DOMAIN}
+CSRF_TRUSTED_ORIGINS=https://${DOMAIN},https://www.${DOMAIN}
 
 SITE_URL=http://${DOMAIN}
 ADMIN_EMAIL=${ADMIN_EMAIL}
@@ -605,7 +606,7 @@ NGX=$(curl -s -o /dev/null -w '%{http_code}' http://localhost/ 2>/dev/null || ec
 # ── Сохраняем данные ─────────────────────────
 cat > /root/credentials.txt << CREDS
 ══════════════════════════════════════════
-  TAXI RATING — $(date)
+  LEMANAS — $(date)
 ══════════════════════════════════════════
 Сайт:   http://${DOMAIN}
 API:    http://${DOMAIN}/api/
@@ -618,8 +619,8 @@ Django admin:
 
 PostgreSQL:
   host:     127.0.0.1
-  db:       taxirating
-  user:     taxiuser
+  db:       lemanddbb
+  user:     lemanuser
   password: ${DB_PASS}
 
 Проект:  ${PROJECT_DIR}
@@ -649,7 +650,7 @@ echo -e "${GREEN}║      ✅ УСТАНОВКА ЗАВЕРШЕНА!            
 echo -e "${GREEN}╠══════════════════════════════════════════╣${NC}"
 printf  "${GREEN}║${NC}  🌐 http://%-30s ${GREEN}║${NC}\n" "$DOMAIN"
 printf  "${GREEN}║${NC}  👑 admin / %-30s ${GREEN}║${NC}\n" "$ADMIN_PASS"
-printf  "${GREEN}║${NC}  🗄️  taxiuser / %-27s ${GREEN}║${NC}\n" "$DB_PASS"
+printf  "${GREEN}║${NC}  🗄️  lemanuser / %-27s ${GREEN}║${NC}\n" "$DB_PASS"
 echo -e "${GREEN}╠══════════════════════════════════════════╣${NC}"
 echo -e "${GREEN}║${NC}  💾 /root/credentials.txt               ${GREEN}║${NC}"
 echo -e "${GREEN}╚══════════════════════════════════════════╝${NC}"
