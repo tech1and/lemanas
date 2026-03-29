@@ -179,7 +179,14 @@ REST_FRAMEWORK = {
         'user': '1000/hour',
         'like': '10/minute',  # Защита от накрутки лайков
         'click': '30/minute',  # Защита от накрутки кликов
-    }
+    },
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.SessionAuthentication',
+        # 'rest_framework.authentication.TokenAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.AllowAny',  # Для публичного API
+    ],
 }
 
 # GeoDjango (если используем PostGIS)
