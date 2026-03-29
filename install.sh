@@ -257,9 +257,6 @@ python manage.py migrate --noinput
 info "Собираем статику..."
 python manage.py collectstatic --noinput --clear
 
-info "Загружаем тестовые данные..."
-python manage.py seed_data || warn "Seed уже выполнен или ошибка"
-
 info "Создаём суперпользователя..."
 python manage.py shell -c "
 from django.contrib.auth import get_user_model
@@ -334,7 +331,12 @@ NEXTCFG
 
 # Создаём .env.local для Next.js
 cat > .env.local << NEXTENV
-NEXT_PUBLIC_API_URL=http://${DOMAIN}/api
+# Для локальной сборки — указываем localhost
+NEXT_PUBLIC_API_URL=http://localhost:8000/api
+
+# Для продакшена раскомментируйте:
+# NEXT_PUBLIC_API_URL=https://api.${DOMAIN}/api
+
 NEXT_PUBLIC_SITE_URL=http://${DOMAIN}
 API_URL=http://127.0.0.1:8000
 NEXT_PUBLIC_SITE_NAME="Лемана Про Каталог"
