@@ -310,23 +310,39 @@ PKG
 cat > next.config.js << 'NEXTCFG'
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: false,
-  eslint:     { ignoreDuringBuilds: true },
-  typescript: { ignoreBuildErrors: true },
+  // ✅ Включить standalone режим для меньшего размера деплоя
+  output: 'standalone',
+  
+  // Разрешить изображения с CDN Лемана Про
   images: {
-    unoptimized: true,
+    domains: ['cdn.lemanapro.ru'],
     remotePatterns: [
-      { protocol: 'http',  hostname: '**' },
-      { protocol: 'https', hostname: '**' },
+      {
+        protocol: 'https',
+        hostname: 'cdn.lemanapro.ru',
+        pathname: '/lmru/image/**',
+      },
     ],
   },
+  
+  // Переменные окружения
   env: {
-    API_URL:              process.env.API_URL              || 'http://localhost:8000',
-    NEXT_PUBLIC_API_URL:  process.env.NEXT_PUBLIC_API_URL  || 'http://localhost:8000',
-    NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000',
+    NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL,
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
   },
-};
-module.exports = nextConfig;
+  
+  // Прокси API для разработки
+  async rewrites() {
+    return [
+      {
+        source: '/api/:path*',
+        destination: `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/:path*`,
+      },
+    ]
+  },
+}
+
+module.exports = nextConfig
 NEXTCFG
 
 # Создаём .env.local для Next.js
