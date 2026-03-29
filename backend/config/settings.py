@@ -41,7 +41,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'corsheaders.middleware.CorsMiddleware',
+    'corsheaders.middleware.CorsMiddleware',  # ← Должен быть ПЕРВЫМ
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -143,7 +143,13 @@ CSRF_TRUSTED_ORIGINS = os.getenv(
 
 # 🔥 Убедитесь, что кука доступна по HTTPS
 CSRF_COOKIE_SECURE = True  # Если сайт на HTTPS
+CSRF_COOKIE_HTTPONLY = False  # False чтобы JS мог читать cookie
 CSRF_COOKIE_SAMESITE = 'Lax'  # Или 'None', если нужны кросс-доменные запросы
+
+# Session Cookie Settings
+SESSION_COOKIE_SECURE = True  # True для HTTPS
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Lax'
 
 CORS_ALLOWED_ORIGINS = os.getenv(
     'CORS_ALLOWED_ORIGINS',

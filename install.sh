@@ -211,8 +211,8 @@ DB_PORT=5432
 
 REDIS_URL=redis://127.0.0.1:6379/1
 
-CORS_ALLOWED_ORIGINS=http://localhost:3000,http://${DOMAIN},https://${DOMAIN}
-CSRF_TRUSTED_ORIGINS=https://${DOMAIN},https://www.${DOMAIN}
+CORS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,http://${DOMAIN},https://${DOMAIN}
+CSRF_TRUSTED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,http://${DOMAIN},https://${DOMAIN}
 
 SITE_URL=http://${DOMAIN}
 ADMIN_EMAIL=${ADMIN_EMAIL}
