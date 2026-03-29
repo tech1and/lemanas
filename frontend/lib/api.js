@@ -1,67 +1,46 @@
 // frontend/lib/api.js
 import axios from 'axios'
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'
+// ✅ Правильный baseURL с /api в конце
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api'
 
 const api = axios.create({
   baseURL: API_BASE,
   timeout: 5000,
-  headers: { 'Content-Type': 'application/json' }
+  headers: { 
+    'Content-Type': 'application/json',
+    'X-Requested-With': 'XMLHttpRequest'  // Для Django CSRF
+  },
+  withCredentials: true  // Передавать CSRF cookie
 })
 
 /**
- * Безопасный запрос с fallback при ошибке (критично для SSG!)
- * @param {string} url 
- * @param {Object} config 
- * @param {any} fallback 
+ * Безопасный запрос с fallback при ошибке
  */
 async function safeFetch(url, config = {}, fallback = []) {
   try {
     const { data } = await api.get(url, config)
     return data.results || data || fallback
   } catch (error) {
-    // Логируем, но НЕ падаем — важно для npm run build
     console.warn(`⚠️ API fallback for ${url}:`, error.message)
     return fallback
   }
 }
 
 /**
- * Получить топ товаров (с защитой от падения сборки)
+ * Получить топ товаров
  */
 export async function fetchTopProducts(limit = 12) {
-  return safeFetch('/products/', {
+  return safeFetch('/catalog/products/', {  // ✅ Правильный путь
     params: { limit, ordering: '-likes_count' }
-  }, []) // fallback: пустой массив
-}
-
-/**
- * Получить товары по городу
- */
-export async function fetchTopProductsByCity(cityId, limit = 12) {
-  return safeFetch('/products/', {
-    params: { city: cityId, limit, ordering: '-views_count' }
   }, [])
 }
 
 /**
- * Получить товар по slug
- */
-export async function fetchProductBySlug(slug) {
-  try {
-    const { data } = await api.get(`/products/${slug}/`)
-    return data
-  } catch (error) {
-    console.warn(`⚠️ Product not found: ${slug}`)
-    return null // fallback: null
-  }
-}
-
-/**
- * Получить все города (для sitemap)
+ * Получить все города
  */
 export async function fetchCities() {
-  return safeFetch('/cities/', {}, [])
+  return safeFetch('/catalog/cities/', {}, [])  // ✅ Правильный путь
 }
 
 /**
@@ -69,7 +48,7 @@ export async function fetchCities() {
  */
 export async function fetchCityBySlug(slug) {
   try {
-    const { data } = await api.get(`/cities/${slug}/`)
+    const { data } = await api.get(`/catalog/cities/${slug}/`)
     return data
   } catch (error) {
     console.warn(`⚠️ City not found: ${slug}`)
@@ -82,7 +61,7 @@ export async function fetchCityBySlug(slug) {
  */
 export async function fetchCategoryBySlug(slug) {
   try {
-    const { data } = await api.get(`/categories/${slug}/`)
+    const { data } = await api.get(`/catalog/categories/${slug}/`)
     return data
   } catch (error) {
     console.warn(`⚠️ Category not found: ${slug}`)
@@ -94,7 +73,20 @@ export async function fetchCategoryBySlug(slug) {
  * Получить товары категории
  */
 export async function fetchProductsByCategory(categorySlug, filters = {}) {
-  return safeFetch(`/categories/${categorySlug}/products/`, { params: filters }, { results: [], count: 0 })
+  return safeFetch(`/catalog/categories/${categorySlug}/products/`, { params: filters }, { results: [], count: 0 })
+}
+
+/**
+ * Получить товар по slug
+ */
+export async function fetchProductBySlug(slug) {
+  try {
+    const { data } = await api.get(`/catalog/products/${slug}/`)
+    return data
+  } catch (error) {
+    console.warn(`⚠️ Product not found: ${slug}`)
+    return null
+  }
 }
 
 /**
@@ -102,7 +94,7 @@ export async function fetchProductsByCategory(categorySlug, filters = {}) {
  */
 export async function fetchStoreBySlug(slug) {
   try {
-    const { data } = await api.get(`/stores/${slug}/`)
+    const { data } = await api.get(`/catalog/stores/${slug}/`)
     return data
   } catch (error) {
     console.warn(`⚠️ Store not found: ${slug}`)
@@ -114,7 +106,7 @@ export async function fetchStoreBySlug(slug) {
  * Получить похожие товары
  */
 export async function fetchRelatedProducts(productId, limit = 4) {
-  return safeFetch(`/products/${productId}/related/`, { params: { limit } }, [])
+  return safeFetch(`/catalog/products/${productId}/related/`, { params: { limit } }, [])
 }
 
 export default api
