@@ -261,14 +261,14 @@ info "Создаём суперпользователя..."
 python manage.py shell -c "
 from django.contrib.auth import get_user_model
 U = get_user_model()
-if not U.objects.filter(username='admin').exists():
-    U.objects.create_superuser('admin', '${ADMIN_EMAIL}', '${ADMIN_PASS}')
-    print('✅ admin создан')
+if not U.objects.filter(username='lemandmin').exists():
+    U.objects.create_superuser('lemandmin', '${ADMIN_EMAIL}', '${ADMIN_PASS}')
+    print('✅ lemandmin создан')
 else:
-    u = U.objects.get(username='admin')
+    u = U.objects.get(username='lemandmin')
     u.set_password('${ADMIN_PASS}')
     u.save()
-    print('✅ пароль admin обновлён')
+    print('✅ пароль lemandmin обновлён')
 "
 
 cd "$PROJECT_DIR"
@@ -454,78 +454,290 @@ step "Nginx конфигурация"
 rm -f /etc/nginx/sites-enabled/default
 
 cat > /etc/nginx/sites-available/leman << NGINXCFG
-# Рейтинг таксопарков Москвы
 # Домен: ${DOMAIN}
+# Backend: Django (127.0.0.1:8000)
+# Frontend: Next.js (127.0.0.1:3000)
 
-# Rate limiting
-limit_req_zone \$binary_remote_addr zone=api:10m rate=60r/m;
+# ── Глобальные настройки ──────────────────────────────────
+worker_processes auto;
+pid /opt/leman/nginx/nginx.pid;
+error_log /opt/leman/nginx/error.log warn;
 
-server {
-    listen 80;
-    server_name ${DOMAIN} www.${DOMAIN};
-    client_max_body_size 10M;
+events {
+    worker_connections 2048;
+    use epoll;
+    multi_accept on;
+}
 
-    # Логи
-    access_log /var/log/nginx/leman-access.log;
-    error_log  /var/log/nginx/leman-error.log;
-
-    # Gzip
+http {
+    # ── Базовые настройки ─────────────────────────────────
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+    
+    # Логи в формате JSON для удобного парсинга
+    log_format main '$remote_addr - $remote_user [$time_local] "$request" '
+                    '$status $body_bytes_sent "$http_referer" '
+                    '"$http_user_agent" "$http_x_forwarded_for" '
+                    'rt=$request_time uct="$upstream_connect_time" '
+                    'uht="$upstream_header_time" urt="$upstream_response_time"';
+    
+    access_log /opt/leman/nginx/access.log main;
+    
+    # Оптимизация отправки файлов
+    sendfile on;
+    tcp_nopush on;
+    tcp_nodelay on;
+    keepalive_timeout 65;
+    types_hash_max_size 4096;
+    
+    # Gzip сжатие
     gzip on;
-    gzip_types text/plain text/css application/json
-               application/javascript text/javascript;
-
-    # Django статика
-    location /static/ {
-        alias ${PROJECT_DIR}/backend/staticfiles/;
-        expires 30d;
-        add_header Cache-Control "public, immutable";
+    gzip_vary on;
+    gzip_proxied any;
+    gzip_comp_level 6;
+    gzip_min_length 256;
+    gzip_types text/plain text/css text/xml text/javascript
+               application/json application/javascript application/xml
+               application/xml+rss application/x-javascript image/svg+xml;
+    
+    # ── Rate limiting зоны (ОБЯЗАТЕЛЬНО в http контексте!) ─
+    limit_req_zone $binary_remote_addr zone=api:10m rate=60r/m;
+    limit_req_zone $binary_remote_addr zone=general:10m rate=120r/m;
+    limit_req_zone $binary_remote_addr zone=login:10m rate=5r/m;
+    
+    # ── Upstream для Django backend ────────────────────────
+    upstream backend {
+        server 127.0.0.1:8000 fail_timeout=30s max_fails=3;
+        keepalive 32;
     }
-
-    # Django медиа
-    location /media/ {
-        alias ${PROJECT_DIR}/backend/media/;
-        expires 7d;
+    
+    # ── Upstream для Next.js frontend ──────────────────────
+    upstream frontend {
+        server 127.0.0.1:3000 fail_timeout=30s max_fails=3;
+        keepalive 64;
     }
-
-    # Django Admin
-    location /admin/ {
-        proxy_pass         http://127.0.0.1:8000;
-        proxy_set_header   Host              \$host;
-        proxy_set_header   X-Real-IP         \$remote_addr;
-        proxy_set_header   X-Forwarded-For   \$proxy_add_x_forwarded_for;
-        proxy_set_header   X-Forwarded-Proto \$scheme;
-        proxy_connect_timeout 30s;
-        proxy_read_timeout    30s;
+    
+    # ── HTTP сервер (редирект на HTTPS) ────────────────────
+    server {
+        listen 80;
+        server_name ${DOMAIN} www.${DOMAIN};
+        
+        # Certbot challenge для обновления сертификатов
+        location /.well-known/acme-challenge/ {
+            root /opt/leman/nginx/certbot;
+            access_log off;
+            log_not_found off;
+        }
+        
+        # Редирект всех запросов на HTTPS
+        location / {
+            return 301 https://$server_name$request_uri;
+        }
     }
-
-    # Django REST API
-    location /api/ {
-        limit_req zone=api burst=30 nodelay;
-        proxy_pass         http://127.0.0.1:8000;
-        proxy_set_header   Host              \$host;
-        proxy_set_header   X-Real-IP         \$remote_addr;
-        proxy_set_header   X-Forwarded-For   \$proxy_add_x_forwarded_for;
-        proxy_set_header   X-Forwarded-Proto \$scheme;
-        proxy_connect_timeout 30s;
-        proxy_read_timeout    30s;
+    
+    # ── HTTPS сервер (основной) ────────────────────────────
+    server {
+        listen 443 ssl http2;
+        server_name ${DOMAIN} www.${DOMAIN};
+        
+        client_max_body_size 50M;
+        
+        # ── SSL сертификаты ────────────────────────────────
+        ssl_certificate /opt/leman/nginx/certs/fullchain.pem;
+        ssl_certificate_key /opt/leman/nginx/certs/privkey.pem;
+        ssl_protocols TLSv1.2 TLSv1.3;
+        ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
+        ssl_prefer_server_ciphers on;
+        ssl_session_cache shared:SSL:10m;
+        ssl_session_timeout 10m;
+        ssl_session_tickets off;
+        
+        # OCSP Stapling
+        ssl_stapling on;
+        ssl_stapling_verify on;
+        resolver 8.8.8.8 8.8.4.4 valid=300s;
+        resolver_timeout 5s;
+        
+        # ── Логи ───────────────────────────────────────────
+        access_log /opt/leman/nginx/access.log main;
+        error_log /opt/leman/nginx/error.log warn;
+        
+        # ── Кэширование статики ────────────────────────────
+        # Django статика (админка, DRF)
+        location /static/ {
+            alias /opt/leman/backend/staticfiles/;
+            expires 30d;
+            add_header Cache-Control "public, immutable";
+            access_log off;
+        }
+        
+        # Django медиа (загрузки пользователей)
+        location /media/ {
+            alias /opt/leman/backend/media/;
+            expires 7d;
+            add_header Cache-Control "public";
+            access_log off;
+        }
+        
+        # Next.js статика (оптимизированные ассеты)
+        location /_next/static/ {
+            alias /opt/leman/frontend/.next/static/;
+            expires 365d;
+            add_header Cache-Control "public, immutable";
+            access_log off;
+        }
+        
+        # Public assets фронтенда
+        location /images/ {
+            alias /opt/leman/frontend/public/images/;
+            expires 30d;
+            access_log off;
+        }
+        
+        # ── Health check endpoint ──────────────────────────
+        location /health/ {
+            access_log off;
+            return 200 "OK\n";
+            add_header Content-Type text/plain;
+        }
+        
+        # ── Django Admin (с повышенной защитой) ────────────
+        location /admin/ {
+            limit_req zone=login burst=3 nodelay;
+            
+            proxy_pass http://backend;
+            
+            proxy_http_version 1.1;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Forwarded-Host $host;
+            
+            # CSRF cookie для Django админки
+            proxy_set_header Cookie $http_cookie;
+            
+            proxy_connect_timeout 60s;
+            proxy_send_timeout 60s;
+            proxy_read_timeout 60s;
+            
+            # Буферы для больших форм
+            proxy_buffer_size 128k;
+            proxy_buffers 4 256k;
+            proxy_busy_buffers_size 256k;
+        }
+        
+        # ── Django REST API (с rate limiting) ──────────────
+        location /api/ {
+            limit_req zone=api burst=30 nodelay;
+            
+            proxy_pass http://backend;
+            
+            proxy_http_version 1.1;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Forwarded-Host $host;
+            
+            # CSRF cookie (критично для Django + Next.js)
+            proxy_set_header Cookie $http_cookie;
+            
+            # WebSocket поддержка
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+            
+            proxy_connect_timeout 60s;
+            proxy_send_timeout 60s;
+            proxy_read_timeout 60s;
+            
+            # Буферы
+            proxy_buffer_size 128k;
+            proxy_buffers 4 256k;
+            proxy_busy_buffers_size 256k;
+            
+            # Не кэшировать API ответы
+            proxy_no_cache 1;
+            proxy_cache_bypass 1;
+        }
+        
+        # ── Sitemap и Robots.txt ───────────────────────────
+        location = /sitemap.xml {
+            proxy_pass http://frontend;
+            proxy_http_version 1.1;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        
+        location = /robots.txt {
+            proxy_pass http://frontend;
+            proxy_http_version 1.1;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        
+        # ── Next.js Frontend (основной трафик) ─────────────
+        location / {
+            limit_req zone=general burst=50 nodelay;
+            
+            proxy_pass http://frontend;
+            
+            proxy_http_version 1.1;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Forwarded-Host $host;
+            
+            # WebSocket поддержка для Next.js
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+            
+            # Таймауты
+            proxy_connect_timeout 60s;
+            proxy_send_timeout 60s;
+            proxy_read_timeout 60s;
+            
+            # Буферы для больших страниц
+            proxy_buffer_size 128k;
+            proxy_buffers 4 256k;
+            proxy_busy_buffers_size 256k;
+        }
+        
+        # ── Certbot (для обновления сертификатов) ──────────
+        location /.well-known/acme-challenge/ {
+            root /opt/leman/nginx/certbot;
+            access_log off;
+            log_not_found off;
+        }
+        
+        # ── Запрет доступа к чувствительным файлам ─────────
+        location ~ /\. {
+            deny all;
+            access_log off;
+            log_not_found off;
+        }
+        
+        location ~* \.(env|git|htaccess|htpasswd|sql|log)$ {
+            deny all;
+            access_log off;
+            log_not_found off;
+        }
     }
-
-    # Next.js frontend
-    location / {
-        proxy_pass         http://127.0.0.1:3000;
-        proxy_set_header   Host              \$host;
-        proxy_set_header   X-Real-IP         \$remote_addr;
-        proxy_set_header   X-Forwarded-For   \$proxy_add_x_forwarded_for;
-        proxy_set_header   X-Forwarded-Proto \$scheme;
-        proxy_http_version 1.1;
-        proxy_set_header   Upgrade    \$http_upgrade;
-        proxy_set_header   Connection upgrade;
-        proxy_read_timeout 60s;
-    }
-
-    # Certbot
-    location /.well-known/acme-challenge/ {
-        root /var/www/certbot;
+    
+    # ── www → без www редирект (HTTPS) ─────────────────────
+    server {
+        listen 443 ssl http2;
+        server_name www.${DOMAIN};
+        
+        ssl_certificate /opt/leman/nginx/certs/fullchain.pem;
+        ssl_certificate_key /opt/leman/nginx/certs/privkey.pem;
+        
+        return 301 https://${DOMAIN}$request_uri;
     }
 }
 NGINXCFG
