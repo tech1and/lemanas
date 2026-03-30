@@ -163,7 +163,7 @@ if [ -d "$PROJECT_DIR/.git" ]; then
     git pull origin main
 else
     info "Клонируем репозиторий..."
-    git clone https://github.com/tech1and/taxi2.git "$PROJECT_DIR"
+    git clone https://github.com/tech1and/lemanas.git "$PROJECT_DIR"
     cd "$PROJECT_DIR"
 fi
 
