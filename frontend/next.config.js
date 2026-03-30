@@ -1,33 +1,39 @@
-// frontend/next.config.js
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Разрешаем изображения с CDN Лемана Про
+  // 🔹 Вариант А: Отключить standalone (проще для обычного сервера)
+  // output: 'standalone',  // ← Закомментируйте эту строку!
+  
+  // 🔹 Вариант Б: Если оставляете standalone — запускайте через:
+  // node .next/standalone/server.js  (а не next start!)
+  
+  reactStrictMode: false,
+  eslint: { ignoreDuringBuilds: true },
+  typescript: { ignoreBuildErrors: true },
+  
   images: {
-    domains: ['cdn.lemanapro.ru'],
+    unoptimized: true,
     remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: 'cdn.lemanapro.ru',
-        pathname: '/lmru/image/**',
-      },
+      { protocol: 'https', hostname: '**' },
+      { protocol: 'http', hostname: '**' },
     ],
   },
   
-  // Переменные окружения
-  env: {
-    NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL,
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
-  },
-  
-  // Кэширование для API-запросов в sitemap
+  // 🔹 Проксирование API-запросов на Django-бэкенд
   async rewrites() {
     return [
       {
         source: '/api/:path*',
-        destination: `${process.env.NEXT_PUBLIC_API_URL}/:path*`,
+        destination: `${process.env.API_URL || 'http://127.0.0.1:8000'}/api/:path*`,
       },
-    ]
+    ];
   },
-}
+  
+  // 🔹 Переменные окружения (без дефолтов, чтобы брать из .env.local)
+  env: {
+    API_URL: process.env.API_URL,
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
+    NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL,
+  },
+};
 
-module.exports = nextConfig
+module.exports = nextConfig;

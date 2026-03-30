@@ -1,112 +1,77 @@
-// frontend/lib/api.js
-import axios from 'axios'
+import axios from 'axios';
 
-// ✅ Правильный baseURL с /api в конце
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api'
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').trim();
 
 const api = axios.create({
   baseURL: API_BASE,
-  timeout: 5000,
-  headers: { 
+  timeout: 10000,
+  headers: {
     'Content-Type': 'application/json',
-    'X-Requested-With': 'XMLHttpRequest'  // Для Django CSRF
   },
-  withCredentials: true  // Передавать CSRF cookie
-})
+  withCredentials: true, // 🔥 Обязательно: отправлять куки (включая csrftoken)
+});
 
-/**
- * Безопасный запрос с fallback при ошибке
- */
-async function safeFetch(url, config = {}, fallback = []) {
-  try {
-    const { data } = await api.get(url, config)
-    return data.results || data || fallback
-  } catch (error) {
-    console.warn(`⚠️ API fallback for ${url}:`, error.message)
-    return fallback
+// 🔥 Интерцептор: автоматически добавляет CSRF-токен к POST/PUT/DELETE запросам
+api.interceptors.request.use((config) => {
+  const csrfToken = getCookie('csrftoken');
+  
+  // Добавляем токен только к "изменяющим" запросам и только если он есть
+  if (csrfToken && config.method && ['post', 'put', 'patch', 'delete'].includes(config.method.toLowerCase())) {
+    config.headers['X-CSRFToken'] = csrfToken;
   }
-}
+  
+  return config;
+});
 
-/**
- * Получить топ товаров
- */
-export async function fetchTopProducts(limit = 12) {
-  return safeFetch('/catalog/products/', {  // ✅ Правильный путь
-    params: { limit, ordering: '-likes_count' }
-  }, [])
-}
-
-/**
- * Получить все города
- */
-export async function fetchCities() {
-  return safeFetch('/catalog/cities/', {}, [])  // ✅ Правильный путь
-}
-
-/**
- * Получить город по slug
- */
-export async function fetchCityBySlug(slug) {
-  try {
-    const { data } = await api.get(`/catalog/cities/${slug}/`)
-    return data
-  } catch (error) {
-    console.warn(`⚠️ City not found: ${slug}`)
-    return null
+// 🍪 Вспомогательная функция для получения куки по имени
+function getCookie(name) {
+  if (typeof document === 'undefined') return null; // SSR-защита для Next.js
+  
+  const cookieString = document.cookie;
+  if (!cookieString) return null;
+  
+  const cookies = cookieString.split(';');
+  for (let cookie of cookies) {
+    const [cookieName, cookieValue] = cookie.trim().split('=');
+    if (cookieName === name) {
+      return decodeURIComponent(cookieValue);
+    }
   }
+  return null;
 }
 
-/**
- * Получить категорию по slug
- */
-export async function fetchCategoryBySlug(slug) {
-  try {
-    const { data } = await api.get(`/catalog/categories/${slug}/`)
-    return data
-  } catch (error) {
-    console.warn(`⚠️ Category not found: ${slug}`)
-    return null
+// 🔥 Интерцептор ответов: удобная обработка ошибок (опционально)
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 403) {
+      console.warn('CSRF ошибка: проверьте, что токен получен и отправлен');
+    }
+    return Promise.reject(error);
   }
-}
+);
 
-/**
- * Получить товары категории
- */
-export async function fetchProductsByCategory(categorySlug, filters = {}) {
-  return safeFetch(`/catalog/categories/${categorySlug}/products/`, { params: filters }, { results: [], count: 0 })
-}
+export const taxiparksAPI = {
+  getList: (params = {}) =>
+    api.get('/api/taxiparks/', { params }),
+  
+  getDetail: (slug) =>
+    api.get(`/api/taxiparks/${slug}/`),
+  
+  like: (slug) =>
+    api.post(`/api/taxiparks/${slug}/like/`), // Теперь будет с CSRF-токеном!
+  
+  addComment: (slug, data) =>
+    api.post(`/api/taxiparks/${slug}/comment/`, data),
+};
 
-/**
- * Получить товар по slug
- */
-export async function fetchProductBySlug(slug) {
-  try {
-    const { data } = await api.get(`/catalog/products/${slug}/`)
-    return data
-  } catch (error) {
-    console.warn(`⚠️ Product not found: ${slug}`)
-    return null
-  }
-}
+export const blogAPI = {
+  getPosts: (params = {}) =>
+    api.get('/api/blog/posts/', { params }),
+  getPost: (slug) =>
+    api.get(`/api/blog/posts/${slug}/`),
+  getCategories: () =>
+    api.get('/api/blog/categories/'),
+};
 
-/**
- * Получить магазин по slug
- */
-export async function fetchStoreBySlug(slug) {
-  try {
-    const { data } = await api.get(`/catalog/stores/${slug}/`)
-    return data
-  } catch (error) {
-    console.warn(`⚠️ Store not found: ${slug}`)
-    return null
-  }
-}
-
-/**
- * Получить похожие товары
- */
-export async function fetchRelatedProducts(productId, limit = 4) {
-  return safeFetch(`/catalog/products/${productId}/related/`, { params: { limit } }, [])
-}
-
-export default api
+export default api;

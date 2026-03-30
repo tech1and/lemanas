@@ -11,7 +11,6 @@ class Category(models.Model):
     class Meta:
         verbose_name = 'Категория'
         verbose_name_plural = 'Категории'
-        app_label = 'blog'
 
     def __str__(self):
         return self.name
@@ -43,7 +42,6 @@ class Post(models.Model):
         verbose_name = 'Статья'
         verbose_name_plural = 'Статьи'
         ordering = ['-created_at']
-        app_label = 'blog'
 
     def __str__(self):
         return self.title

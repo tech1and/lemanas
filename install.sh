@@ -24,7 +24,7 @@ ADMIN_EMAIL=${ADMIN_EMAIL:-admin@example.com}
 DB_PASS=$(openssl rand -hex 16)
 ADMIN_PASS=$(openssl rand -hex 10)
 SECRET_KEY=$(openssl rand -hex 32)
-PROJECT_DIR="/opt/leman"
+PROJECT_DIR="/opt/taxi-rating"
 
 ok "Домен: $DOMAIN"
 
@@ -36,14 +36,6 @@ apt-get install -y -qq \
     curl wget git unzip nano htop \
     build-essential openssl ca-certificates \
     gnupg lsb-release ufw fail2ban \
-	binutils \
-    libproj-dev \
-    gdal-bin \
-    libgdal-dev \
-    libgeos-dev \
-    libgeos-c1v5 \
-    proj-bin \
-    proj-data\
     supervisor
 
 ok "Базовые пакеты установлены"
@@ -106,29 +98,28 @@ info "Создание БД..."
 sudo -u postgres psql -v ON_ERROR_STOP=0 << PSQL
 DO \$\$
 BEGIN
-  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='lemanuser') THEN
-    CREATE USER lemanuser WITH PASSWORD '${DB_PASS}' CREATEDB;
+  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='taxiuser') THEN
+    CREATE USER taxiuser WITH PASSWORD '${DB_PASS}' CREATEDB;
   ELSE
-    ALTER USER lemanuser WITH PASSWORD '${DB_PASS}';
+    ALTER USER taxiuser WITH PASSWORD '${DB_PASS}';
   END IF;
 END\$\$;
 
-SELECT 'CREATE DATABASE lemanddbb
-  OWNER lemanuser
+SELECT 'CREATE DATABASE taxirating
+  OWNER taxiuser
   ENCODING ''UTF8''
   TEMPLATE template0'
 WHERE NOT EXISTS (
-  SELECT FROM pg_database WHERE datname='lemanddbb'
+  SELECT FROM pg_database WHERE datname='taxirating'
 )\gexec
 
-GRANT ALL PRIVILEGES ON DATABASE lemanddbb TO lemanuser;
-\c lemanddbb
+GRANT ALL PRIVILEGES ON DATABASE taxirating TO taxiuser;
+\c taxirating
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 CREATE EXTENSION IF NOT EXISTS unaccent;
-
 PSQL
 
-ok "БД lemanddbb создана"
+ok "БД taxirating создана"
 
 # ── Redis ─────────────────────────────────────
 step "Redis"
@@ -172,7 +163,7 @@ if [ -d "$PROJECT_DIR/.git" ]; then
     git pull origin main
 else
     info "Клонируем репозиторий..."
-    git clone https://github.com/tech1and/lemanas.git "$PROJECT_DIR"
+    git clone https://github.com/tech1and/taxi2.git "$PROJECT_DIR"
     cd "$PROJECT_DIR"
 fi
 
@@ -203,16 +194,15 @@ SECRET_KEY=${SECRET_KEY}
 DEBUG=False
 ALLOWED_HOSTS=localhost,127.0.0.1,${DOMAIN}
 
-DB_NAME=lemanddbb
-DB_USER=lemanuser
+DB_NAME=taxirating
+DB_USER=taxiuser
 DB_PASSWORD=${DB_PASS}
 DB_HOST=127.0.0.1
 DB_PORT=5432
 
 REDIS_URL=redis://127.0.0.1:6379/1
 
-CORS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,http://${DOMAIN},https://${DOMAIN}
-CSRF_TRUSTED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,http://${DOMAIN},https://${DOMAIN}
+CORS_ALLOWED_ORIGINS=http://localhost:3000,http://${DOMAIN},https://${DOMAIN}
 
 SITE_URL=http://${DOMAIN}
 ADMIN_EMAIL=${ADMIN_EMAIL}
@@ -227,14 +217,14 @@ cd "$PROJECT_DIR"
 
 # Создаём все __init__.py
 touch backend/apps/__init__.py
-touch backend/apps/catalog/__init__.py
+touch backend/apps/taxiparks/__init__.py
 touch backend/apps/blog/__init__.py
 
-mkdir -p backend/apps/catalog/management/commands
+mkdir -p backend/apps/taxiparks/management/commands
 mkdir -p backend/apps/blog/management/commands
 
-touch backend/apps/catalog/management/__init__.py
-touch backend/apps/catalog/management/commands/__init__.py
+touch backend/apps/taxiparks/management/__init__.py
+touch backend/apps/taxiparks/management/commands/__init__.py
 touch backend/apps/blog/management/__init__.py
 touch backend/apps/blog/management/commands/__init__.py
 
@@ -257,18 +247,21 @@ python manage.py migrate --noinput
 info "Собираем статику..."
 python manage.py collectstatic --noinput --clear
 
+info "Загружаем тестовые данные..."
+python manage.py seed_data || warn "Seed уже выполнен или ошибка"
+
 info "Создаём суперпользователя..."
 python manage.py shell -c "
 from django.contrib.auth import get_user_model
 U = get_user_model()
-if not U.objects.filter(username='lemandmin').exists():
-    U.objects.create_superuser('lemandmin', '${ADMIN_EMAIL}', '${ADMIN_PASS}')
-    print('✅ lemandmin создан')
+if not U.objects.filter(username='admin').exists():
+    U.objects.create_superuser('admin', '${ADMIN_EMAIL}', '${ADMIN_PASS}')
+    print('✅ admin создан')
 else:
-    u = U.objects.get(username='lemandmin')
+    u = U.objects.get(username='admin')
     u.set_password('${ADMIN_PASS}')
     u.save()
-    print('✅ пароль lemandmin обновлён')
+    print('✅ пароль admin обновлён')
 "
 
 cd "$PROJECT_DIR"
@@ -285,7 +278,7 @@ rm -f package-lock.json yarn.lock pnpm-lock.yaml
 # Создаём актуальный package.json
 cat > package.json << 'PKG'
 {
-  "name": "leman-frontend",
+  "name": "taxi-rating-frontend",
   "version": "1.0.0",
   "private": true,
   "scripts": {
@@ -310,52 +303,30 @@ PKG
 cat > next.config.js << 'NEXTCFG'
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // ✅ Включить standalone режим для меньшего размера деплоя
-  output: 'standalone',
-  
-  // Разрешить изображения с CDN Лемана Про
+  reactStrictMode: false,
+  eslint:     { ignoreDuringBuilds: true },
+  typescript: { ignoreBuildErrors: true },
   images: {
-    domains: ['cdn.lemanapro.ru'],
+    unoptimized: true,
     remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: 'cdn.lemanapro.ru',
-        pathname: '/lmru/image/**',
-      },
+      { protocol: 'http',  hostname: '**' },
+      { protocol: 'https', hostname: '**' },
     ],
   },
-  
-  // Переменные окружения
   env: {
-    NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL,
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
+    API_URL:              process.env.API_URL              || 'http://localhost:8000',
+    NEXT_PUBLIC_API_URL:  process.env.NEXT_PUBLIC_API_URL  || 'http://localhost:8000',
+    NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000',
   },
-  
-  // Прокси API для разработки
-  async rewrites() {
-    return [
-      {
-        source: '/api/:path*',
-        destination: `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/:path*`,
-      },
-    ]
-  },
-}
-
-module.exports = nextConfig
+};
+module.exports = nextConfig;
 NEXTCFG
 
 # Создаём .env.local для Next.js
 cat > .env.local << NEXTENV
-# Для локальной сборки — указываем localhost
-NEXT_PUBLIC_API_URL=http://localhost:8000/api
-
-# Для продакшена раскомментируйте:
-# NEXT_PUBLIC_API_URL=https://api.${DOMAIN}/api
-
+NEXT_PUBLIC_API_URL=http://${DOMAIN}
 NEXT_PUBLIC_SITE_URL=http://${DOMAIN}
 API_URL=http://127.0.0.1:8000
-NEXT_PUBLIC_SITE_NAME="Лемана Про Каталог"
 NEXTENV
 
 # Создаём public если нет
@@ -377,8 +348,8 @@ ok "Next.js собран"
 step "Supervisor (управление процессами)"
 
 # Конфиг для Gunicorn (Django)
-cat > /etc/supervisor/conf.d/leman-backend.conf << SUPBACK
-[program:leman-backend]
+cat > /etc/supervisor/conf.d/taxi-backend.conf << SUPBACK
+[program:taxi-backend]
 command=${PROJECT_DIR}/venv/bin/gunicorn config.wsgi:application
     --bind 127.0.0.1:8000
     --workers 3
@@ -391,7 +362,7 @@ autostart=true
 autorestart=true
 startretries=5
 redirect_stderr=true
-stdout_logfile=/var/log/leman-backend.log
+stdout_logfile=/var/log/taxi-backend.log
 stdout_logfile_maxbytes=10MB
 stdout_logfile_backups=3
 environment=
@@ -402,8 +373,8 @@ environment=
 SUPBACK
 
 # Конфиг для Next.js
-cat > /etc/supervisor/conf.d/leman-frontend.conf << SUPFRONT
-[program:leman-frontend]
+cat > /etc/supervisor/conf.d/taxi-frontend.conf << SUPFRONT
+[program:taxi-frontend]
 command=node ${PROJECT_DIR}/frontend/.next/standalone/server.js
 directory=${PROJECT_DIR}/frontend
 user=www-data
@@ -411,7 +382,7 @@ autostart=true
 autorestart=true
 startretries=5
 redirect_stderr=true
-stdout_logfile=/var/log/leman-frontend.log
+stdout_logfile=/var/log/taxi-frontend.log
 stdout_logfile_maxbytes=10MB
 stdout_logfile_backups=3
 environment=
@@ -442,8 +413,8 @@ sleep 3
 
 supervisorctl reread
 supervisorctl update
-supervisorctl start leman-backend  2>/dev/null || true
-supervisorctl start leman-frontend 2>/dev/null || true
+supervisorctl start taxi-backend  2>/dev/null || true
+supervisorctl start taxi-frontend 2>/dev/null || true
 
 ok "Supervisor настроен"
 
@@ -453,297 +424,85 @@ step "Nginx конфигурация"
 # Удаляем дефолтный сайт
 rm -f /etc/nginx/sites-enabled/default
 
-cat > /etc/nginx/sites-available/leman << NGINXCFG
+cat > /etc/nginx/sites-available/taxi-rating << NGINXCFG
+# Рейтинг таксопарков Москвы
 # Домен: ${DOMAIN}
-# Backend: Django (127.0.0.1:8000)
-# Frontend: Next.js (127.0.0.1:3000)
 
-# ── Глобальные настройки ──────────────────────────────────
-worker_processes auto;
-pid /opt/leman/nginx/nginx.pid;
-error_log /opt/leman/nginx/error.log warn;
+# Rate limiting
+limit_req_zone \$binary_remote_addr zone=api:10m rate=60r/m;
 
-events {
-    worker_connections 2048;
-    use epoll;
-    multi_accept on;
-}
+server {
+    listen 80;
+    server_name ${DOMAIN} www.${DOMAIN};
+    client_max_body_size 10M;
 
-http {
-    # ── Базовые настройки ─────────────────────────────────
-    include /etc/nginx/mime.types;
-    default_type application/octet-stream;
-    
-    # Логи в формате JSON для удобного парсинга
-    log_format main '$remote_addr - $remote_user [$time_local] "$request" '
-                    '$status $body_bytes_sent "$http_referer" '
-                    '"$http_user_agent" "$http_x_forwarded_for" '
-                    'rt=$request_time uct="$upstream_connect_time" '
-                    'uht="$upstream_header_time" urt="$upstream_response_time"';
-    
-    access_log /opt/leman/nginx/access.log main;
-    
-    # Оптимизация отправки файлов
-    sendfile on;
-    tcp_nopush on;
-    tcp_nodelay on;
-    keepalive_timeout 65;
-    types_hash_max_size 4096;
-    
-    # Gzip сжатие
+    # Логи
+    access_log /var/log/nginx/taxi-access.log;
+    error_log  /var/log/nginx/taxi-error.log;
+
+    # Gzip
     gzip on;
-    gzip_vary on;
-    gzip_proxied any;
-    gzip_comp_level 6;
-    gzip_min_length 256;
-    gzip_types text/plain text/css text/xml text/javascript
-               application/json application/javascript application/xml
-               application/xml+rss application/x-javascript image/svg+xml;
-    
-    # ── Rate limiting зоны (ОБЯЗАТЕЛЬНО в http контексте!) ─
-    limit_req_zone $binary_remote_addr zone=api:10m rate=60r/m;
-    limit_req_zone $binary_remote_addr zone=general:10m rate=120r/m;
-    limit_req_zone $binary_remote_addr zone=login:10m rate=5r/m;
-    
-    # ── Upstream для Django backend ────────────────────────
-    upstream backend {
-        server 127.0.0.1:8000 fail_timeout=30s max_fails=3;
-        keepalive 32;
+    gzip_types text/plain text/css application/json
+               application/javascript text/javascript;
+
+    # Django статика
+    location /static/ {
+        alias ${PROJECT_DIR}/backend/staticfiles/;
+        expires 30d;
+        add_header Cache-Control "public, immutable";
     }
-    
-    # ── Upstream для Next.js frontend ──────────────────────
-    upstream frontend {
-        server 127.0.0.1:3000 fail_timeout=30s max_fails=3;
-        keepalive 64;
+
+    # Django медиа
+    location /media/ {
+        alias ${PROJECT_DIR}/backend/media/;
+        expires 7d;
     }
-    
-    # ── HTTP сервер (редирект на HTTPS) ────────────────────
-    server {
-        listen 80;
-        server_name ${DOMAIN} www.${DOMAIN};
-        
-        # Certbot challenge для обновления сертификатов
-        location /.well-known/acme-challenge/ {
-            root /opt/leman/nginx/certbot;
-            access_log off;
-            log_not_found off;
-        }
-        
-        # Редирект всех запросов на HTTPS
-        location / {
-            return 301 https://$server_name$request_uri;
-        }
+
+    # Django Admin
+    location /admin/ {
+        proxy_pass         http://127.0.0.1:8000;
+        proxy_set_header   Host              \$host;
+        proxy_set_header   X-Real-IP         \$remote_addr;
+        proxy_set_header   X-Forwarded-For   \$proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto \$scheme;
+        proxy_connect_timeout 30s;
+        proxy_read_timeout    30s;
     }
-    
-    # ── HTTPS сервер (основной) ────────────────────────────
-    server {
-        listen 443 ssl http2;
-        server_name ${DOMAIN} www.${DOMAIN};
-        
-        client_max_body_size 50M;
-        
-        # ── SSL сертификаты ────────────────────────────────
-        ssl_certificate /opt/leman/nginx/certs/fullchain.pem;
-        ssl_certificate_key /opt/leman/nginx/certs/privkey.pem;
-        ssl_protocols TLSv1.2 TLSv1.3;
-        ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
-        ssl_prefer_server_ciphers on;
-        ssl_session_cache shared:SSL:10m;
-        ssl_session_timeout 10m;
-        ssl_session_tickets off;
-        
-        # OCSP Stapling
-        ssl_stapling on;
-        ssl_stapling_verify on;
-        resolver 8.8.8.8 8.8.4.4 valid=300s;
-        resolver_timeout 5s;
-        
-        # ── Логи ───────────────────────────────────────────
-        access_log /opt/leman/nginx/access.log main;
-        error_log /opt/leman/nginx/error.log warn;
-        
-        # ── Кэширование статики ────────────────────────────
-        # Django статика (админка, DRF)
-        location /static/ {
-            alias /opt/leman/backend/staticfiles/;
-            expires 30d;
-            add_header Cache-Control "public, immutable";
-            access_log off;
-        }
-        
-        # Django медиа (загрузки пользователей)
-        location /media/ {
-            alias /opt/leman/backend/media/;
-            expires 7d;
-            add_header Cache-Control "public";
-            access_log off;
-        }
-        
-        # Next.js статика (оптимизированные ассеты)
-        location /_next/static/ {
-            alias /opt/leman/frontend/.next/static/;
-            expires 365d;
-            add_header Cache-Control "public, immutable";
-            access_log off;
-        }
-        
-        # Public assets фронтенда
-        location /images/ {
-            alias /opt/leman/frontend/public/images/;
-            expires 30d;
-            access_log off;
-        }
-        
-        # ── Health check endpoint ──────────────────────────
-        location /health/ {
-            access_log off;
-            return 200 "OK\n";
-            add_header Content-Type text/plain;
-        }
-        
-        # ── Django Admin (с повышенной защитой) ────────────
-        location /admin/ {
-            limit_req zone=login burst=3 nodelay;
-            
-            proxy_pass http://backend;
-            
-            proxy_http_version 1.1;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
-            proxy_set_header X-Forwarded-Host $host;
-            
-            # CSRF cookie для Django админки
-            proxy_set_header Cookie $http_cookie;
-            
-            proxy_connect_timeout 60s;
-            proxy_send_timeout 60s;
-            proxy_read_timeout 60s;
-            
-            # Буферы для больших форм
-            proxy_buffer_size 128k;
-            proxy_buffers 4 256k;
-            proxy_busy_buffers_size 256k;
-        }
-        
-        # ── Django REST API (с rate limiting) ──────────────
-        location /api/ {
-            limit_req zone=api burst=30 nodelay;
-            
-            proxy_pass http://backend;
-            
-            proxy_http_version 1.1;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
-            proxy_set_header X-Forwarded-Host $host;
-            
-            # CSRF cookie (критично для Django + Next.js)
-            proxy_set_header Cookie $http_cookie;
-            
-            # WebSocket поддержка
-            proxy_set_header Upgrade $http_upgrade;
-            proxy_set_header Connection "upgrade";
-            
-            proxy_connect_timeout 60s;
-            proxy_send_timeout 60s;
-            proxy_read_timeout 60s;
-            
-            # Буферы
-            proxy_buffer_size 128k;
-            proxy_buffers 4 256k;
-            proxy_busy_buffers_size 256k;
-            
-            # Не кэшировать API ответы
-            proxy_no_cache 1;
-            proxy_cache_bypass 1;
-        }
-        
-        # ── Sitemap и Robots.txt ───────────────────────────
-        location = /sitemap.xml {
-            proxy_pass http://frontend;
-            proxy_http_version 1.1;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
-        }
-        
-        location = /robots.txt {
-            proxy_pass http://frontend;
-            proxy_http_version 1.1;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
-        }
-        
-        # ── Next.js Frontend (основной трафик) ─────────────
-        location / {
-            limit_req zone=general burst=50 nodelay;
-            
-            proxy_pass http://frontend;
-            
-            proxy_http_version 1.1;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
-            proxy_set_header X-Forwarded-Host $host;
-            
-            # WebSocket поддержка для Next.js
-            proxy_set_header Upgrade $http_upgrade;
-            proxy_set_header Connection "upgrade";
-            
-            # Таймауты
-            proxy_connect_timeout 60s;
-            proxy_send_timeout 60s;
-            proxy_read_timeout 60s;
-            
-            # Буферы для больших страниц
-            proxy_buffer_size 128k;
-            proxy_buffers 4 256k;
-            proxy_busy_buffers_size 256k;
-        }
-        
-        # ── Certbot (для обновления сертификатов) ──────────
-        location /.well-known/acme-challenge/ {
-            root /opt/leman/nginx/certbot;
-            access_log off;
-            log_not_found off;
-        }
-        
-        # ── Запрет доступа к чувствительным файлам ─────────
-        location ~ /\. {
-            deny all;
-            access_log off;
-            log_not_found off;
-        }
-        
-        location ~* \.(env|git|htaccess|htpasswd|sql|log)$ {
-            deny all;
-            access_log off;
-            log_not_found off;
-        }
+
+    # Django REST API
+    location /api/ {
+        limit_req zone=api burst=30 nodelay;
+        proxy_pass         http://127.0.0.1:8000;
+        proxy_set_header   Host              \$host;
+        proxy_set_header   X-Real-IP         \$remote_addr;
+        proxy_set_header   X-Forwarded-For   \$proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto \$scheme;
+        proxy_connect_timeout 30s;
+        proxy_read_timeout    30s;
     }
-    
-    # ── www → без www редирект (HTTPS) ─────────────────────
-    server {
-        listen 443 ssl http2;
-        server_name www.${DOMAIN};
-        
-        ssl_certificate /opt/leman/nginx/certs/fullchain.pem;
-        ssl_certificate_key /opt/leman/nginx/certs/privkey.pem;
-        
-        return 301 https://${DOMAIN}$request_uri;
+
+    # Next.js frontend
+    location / {
+        proxy_pass         http://127.0.0.1:3000;
+        proxy_set_header   Host              \$host;
+        proxy_set_header   X-Real-IP         \$remote_addr;
+        proxy_set_header   X-Forwarded-For   \$proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto \$scheme;
+        proxy_http_version 1.1;
+        proxy_set_header   Upgrade    \$http_upgrade;
+        proxy_set_header   Connection upgrade;
+        proxy_read_timeout 60s;
+    }
+
+    # Certbot
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
     }
 }
 NGINXCFG
 
-ln -sf /etc/nginx/sites-available/leman \
-       /etc/nginx/sites-enabled/leman
+ln -sf /etc/nginx/sites-available/taxi-rating \
+       /etc/nginx/sites-enabled/taxi-rating
 
 nginx -t && systemctl reload nginx
 ok "Nginx настроен"
@@ -825,7 +584,7 @@ supervisorctl status
 echo ""
 info "HTTP проверка:"
 sleep 3
-API=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8000/api/catalog/ 2>/dev/null || echo 000)
+API=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8000/api/taxiparks/ 2>/dev/null || echo 000)
 WEB=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000 2>/dev/null || echo 000)
 NGX=$(curl -s -o /dev/null -w '%{http_code}' http://localhost/ 2>/dev/null || echo 000)
 
@@ -836,7 +595,7 @@ NGX=$(curl -s -o /dev/null -w '%{http_code}' http://localhost/ 2>/dev/null || ec
 # ── Сохраняем данные ─────────────────────────
 cat > /root/credentials.txt << CREDS
 ══════════════════════════════════════════
-  LEMANAS — $(date)
+  TAXI RATING — $(date)
 ══════════════════════════════════════════
 Сайт:   http://${DOMAIN}
 API:    http://${DOMAIN}/api/
@@ -849,19 +608,19 @@ Django admin:
 
 PostgreSQL:
   host:     127.0.0.1
-  db:       lemanddbb
-  user:     lemanuser
+  db:       taxirating
+  user:     taxiuser
   password: ${DB_PASS}
 
 Проект:  ${PROJECT_DIR}
 
 Управление:
   supervisorctl status
-  supervisorctl restart leman-backend
-  supervisorctl restart leman-frontend
-  tail -f /var/log/leman-backend.log
-  tail -f /var/log/leman-frontend.log
-  tail -f /var/log/nginx/leman-error.log
+  supervisorctl restart taxi-backend
+  supervisorctl restart taxi-frontend
+  tail -f /var/log/taxi-backend.log
+  tail -f /var/log/taxi-frontend.log
+  tail -f /var/log/nginx/taxi-error.log
 
 Обновление проекта:
   cd ${PROJECT_DIR}
@@ -880,7 +639,7 @@ echo -e "${GREEN}║      ✅ УСТАНОВКА ЗАВЕРШЕНА!            
 echo -e "${GREEN}╠══════════════════════════════════════════╣${NC}"
 printf  "${GREEN}║${NC}  🌐 http://%-30s ${GREEN}║${NC}\n" "$DOMAIN"
 printf  "${GREEN}║${NC}  👑 admin / %-30s ${GREEN}║${NC}\n" "$ADMIN_PASS"
-printf  "${GREEN}║${NC}  🗄️  lemanuser / %-27s ${GREEN}║${NC}\n" "$DB_PASS"
+printf  "${GREEN}║${NC}  🗄️  taxiuser / %-27s ${GREEN}║${NC}\n" "$DB_PASS"
 echo -e "${GREEN}╠══════════════════════════════════════════╣${NC}"
 echo -e "${GREEN}║${NC}  💾 /root/credentials.txt               ${GREEN}║${NC}"
 echo -e "${GREEN}╚══════════════════════════════════════════╝${NC}"

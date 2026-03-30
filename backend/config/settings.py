@@ -21,27 +21,19 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-
-    # Сторонние
     'rest_framework',
-    'django_filters',
-    'import_export',  # Для экспорта в админке
-    #'django.contrib.gis',  # GeoDjango для карт
-    #'tinymce',
+    'import_export',
+    'tinymce',
     'corsheaders',
-    
-     # Локальные
-    'apps.catalog',
-    'apps.geo',
-    'apps.reviews',
-    'apps.analytics',
+    'django_filters',
     'apps.blog',
+    'apps.taxiparks',
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'corsheaders.middleware.CorsMiddleware',  # ← Должен быть ПЕРВЫМ
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -68,13 +60,6 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'config.wsgi.application'
-
-# GeoDjango settings
-try:
-    from django.contrib.gis import geos
-    GEOS_LIBRARY_PATH = None  # Авто-определение
-except ImportError:
-    GEOS_LIBRARY_PATH = None
 
 DATABASES = {
     'default': {
@@ -137,19 +122,12 @@ CORS_ALLOW_CREDENTIALS = True
 
 # 🔥 Доверенные источники для CSRF
 CSRF_TRUSTED_ORIGINS = os.getenv(
-    'CSRF_TRUSTED_ORIGINS',
-    default='https://lemanas.ru,https://www.lemanas.ru,http://localhost:3000'
+    'CSRF_TRUSTED_ORIGINS'
 ).split(',')
 
 # 🔥 Убедитесь, что кука доступна по HTTPS
 CSRF_COOKIE_SECURE = True  # Если сайт на HTTPS
-CSRF_COOKIE_HTTPONLY = False  # False чтобы JS мог читать cookie
 CSRF_COOKIE_SAMESITE = 'Lax'  # Или 'None', если нужны кросс-доменные запросы
-
-# Session Cookie Settings
-SESSION_COOKIE_SECURE = True  # True для HTTPS
-SESSION_COOKIE_HTTPONLY = True
-SESSION_COOKIE_SAMESITE = 'Lax'
 
 CORS_ALLOWED_ORIGINS = os.getenv(
     'CORS_ALLOWED_ORIGINS',
@@ -157,41 +135,22 @@ CORS_ALLOWED_ORIGINS = os.getenv(
 ).split(',')
 
 
-# REST Framework settings
 REST_FRAMEWORK = {
-    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 24,
     'DEFAULT_FILTER_BACKENDS': [
-        'django_filters.rest_framework.DjangoFilterBackend',
-        'rest_framework.filters.SearchFilter',
-        'rest_framework.filters.OrderingFilter',
+        'django_filters.rest_framework.DjangoFilterBackend'
     ],
-    'DEFAULT_RENDERER_CLASSES': [
-        'rest_framework.renderers.JSONRenderer',
-        'rest_framework.renderers.BrowsableAPIRenderer',
-    ],
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 20,
     'DEFAULT_THROTTLE_CLASSES': [
         'rest_framework.throttling.AnonRateThrottle',
-        'rest_framework.throttling.UserRateThrottle'
+        'rest_framework.throttling.UserRateThrottle',
     ],
     'DEFAULT_THROTTLE_RATES': {
-        'anon': '100/hour',
-        'user': '1000/hour',
-        'like': '10/minute',  # Защита от накрутки лайков
-        'click': '30/minute',  # Защита от накрутки кликов
-    },
-    'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.SessionAuthentication',
-        # 'rest_framework.authentication.TokenAuthentication',
-    ],
-    'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.AllowAny',  # Для публичного API
-    ],
+        'anon':    '200/hour',
+        'user':    '1000/hour',
+        'comment': '5/hour',
+    }
 }
-
-# GeoDjango (если используем PostGIS)
-if 'django.contrib.gis' in INSTALLED_APPS:
-    GEOS_LIBRARY_PATH = '/usr/lib/libgeos_c.so'  # Путь может отличаться
 
 LOGGING = {
     'version': 1,
@@ -214,10 +173,19 @@ LOGGING = {
     },
 }
 
-# Путь к библиотеке GDAL (может отличаться в зависимости от версии)
-GDAL_LIBRARY_PATH = '/usr/lib/x86_64-linux-gnu/libgdal.so.29'
-GEOS_LIBRARY_PATH = '/usr/lib/x86_64-linux-gnu/libgeos_c.so.1'
-
-# Или оставьте None для авто-определения
-# GDAL_LIBRARY_PATH = None
-# GEOS_LIBRARY_PATH = None
+TINYMCE_JS_URL = os.path.join(STATIC_URL, "/static/tinymce/tinymce.min.js")
+TINYMCE_DEFAULT_CONFIG = {
+    "height": "500px",
+    "width": "960px",
+    "menubar": "file edit view insert format tools table help",
+    "plugins": "advlist autolink lists link image charmap print preview anchor searchreplace visualblocks code "
+    "fullscreen insertdatetime media table paste code help wordcount spellchecker",
+    "toolbar": "undo redo | bold italic underline strikethrough | fontselect fontsizeselect formatselect | alignleft "
+    "aligncenter alignright alignjustify | outdent indent |  numlist bullist checklist | forecolor "
+    "backcolor casechange permanentpen formatpainter removeformat | pagebreak | charmap emoticons | "
+    "fullscreen  preview save print | insertfile image media pageembed template link anchor codesample | "
+    "a11ycheck ltr rtl | showcomments addcomment code",
+    "custom_undo_redo_levels": 10,
+    #"language": "ru_ES",  # To force a specific language instead of the Django current language.
+}
+TINYMCE_SPELLCHECKER = True
