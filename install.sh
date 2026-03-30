@@ -193,25 +193,33 @@ ADMIN_EMAIL=${ADMIN_EMAIL}
 ENV
 ok ".env создан"
 
-# ── Backend: структура приложений ─────────────
-step "Инициализация Django приложений"
-cd "$PROJECT_DIR"
+# ── Backend: валидация структуры ─────────────
+step "Валидация структуры проекта"
+cd "$PROJECT_DIR/backend"
 
-# Создаём директории
-mkdir -p backend/apps/taxiparks/management/commands
-mkdir -p backend/apps/blog/management/commands
-mkdir -p backend/staticfiles backend/media
+# Проверяем критичные файлы
+for file in \
+    "apps/__init__.py" \
+    "apps/taxiparks/__init__.py" \
+    "apps/taxiparks/management/commands/__init__.py" \
+    "apps/blog/__init__.py" \
+    "config/settings.py" \
+    "manage.py"
+do
+    [ -f "$file" ] || die "Отсутствует критичный файл: $file"
+done
 
-# Создаём __init__.py файлы (не директории!)
-touch backend/apps/__init__.py
-touch backend/apps/taxiparks/__init__.py
-touch backend/apps/blog/__init__.py
-touch backend/apps/taxiparks/management/__init__.py 2>/dev/null || true
-touch backend/apps/taxiparks/management/commands/__init__.py 2>/dev/null || true
-touch backend/apps/blog/management/__init__.py 2>/dev/null || true
-touch backend/apps/blog/management/commands/__init__.py 2>/dev/null || true
+# Проверяем директории
+for dir in \
+    "apps/taxiparks/management/commands" \
+    "apps/blog/management/commands" \
+    "staticfiles" \
+    "media"
+do
+    [ -d "$dir" ] || die "Отсутствует директория: $dir"
+done
 
-ok "Структура приложений создана"
+ok "Структура проекта валидна"
 
 # ── Backend: Django setup ──────────────────────
 step "Django: миграции и данные"
