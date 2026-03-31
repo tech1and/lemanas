@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { taxiparksAPI } from '../lib/api';
-import TaxiParkCard from './TaxiParkCard';
+import { storesAPI } from '../lib/api';
+import StoreCard from './StoreCard';
 
 const SORT_OPTIONS = [
   { key: 'rating', label: '⭐ Рейтинг', icon: 'bi-star-fill' },
@@ -10,27 +10,26 @@ const SORT_OPTIONS = [
 ];
 
 export default function RatingList() {
-  const [taxiparks, setTaxiparks] = useState([]);
+  const [stores, setStores] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState('rating');
   const [transitioning, setTransitioning] = useState(false);
 
-  const fetchTaxiparks = async (sort) => {
+  const fetchStores = async (sort) => {
     setTransitioning(true);
     try {
       let params = { page_size: 20 };
-
       if (sort === 'comments') {
         params.sort_by = 'comments';
       } else {
         params.ordering = `-${sort}`;
       }
 
-      const res = await taxiparksAPI.getList(params);
+      const res = await storesAPI.getList(params);
       const results = res.data.results || res.data;
 
       setTimeout(() => {
-        setTaxiparks(results.slice(0, 20));
+        setStores(results.slice(0, 20));
         setTransitioning(false);
         setLoading(false);
       }, 200);
@@ -42,7 +41,7 @@ export default function RatingList() {
   };
 
   useEffect(() => {
-    fetchTaxiparks(sortBy);
+    fetchStores(sortBy);
   }, [sortBy]);
 
   const handleSort = (sort) => {
@@ -54,23 +53,20 @@ export default function RatingList() {
   return (
     <div>
       {/* Sort Controls */}
-      <div className="d-flex flex-wrap align-items-center gap-2 mb-4">
-        <span className="text-muted fw-semibold me-2">Сортировка:</span>
-        <div className="sort-btn-group d-flex flex-wrap gap-2">
-          {SORT_OPTIONS.map(opt => (
-            <button
-              key={opt.key}
-              onClick={() => handleSort(opt.key)}
-              className={`btn btn-sm ${
-                sortBy === opt.key
-                  ? 'btn-warning fw-bold shadow-sm'
-                  : 'btn-outline-secondary'
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
+      <div className="d-flex flex-wrap gap-2 mb-4">
+        <span className="fw-semibold text-muted me-2">Сортировка:</span>
+        {SORT_OPTIONS.map(opt => (
+          <button
+            key={opt.key}
+            onClick={() => handleSort(opt.key)}
+            className={
+              `btn btn-sm ${sortBy === opt.key ? 'btn-warning fw-bold shadow-sm' : 'btn-outline-secondary'}`
+            }
+          >
+            <i className={`bi ${opt.icon} me-1`}></i>
+            {opt.label}
+          </button>
+        ))}
       </div>
 
       {/* List */}
@@ -83,7 +79,7 @@ export default function RatingList() {
       >
         {loading ? (
           Array(5).fill(0).map((_, i) => (
-            <div key={i} className="taxi-card p-3">
+            <div key={i} className="store-card p-3">
               <div className="d-flex gap-3 align-items-center">
                 <div className="placeholder-glow">
                   <span className="placeholder rounded-circle" style={{ width: 48, height: 48, display: 'block' }} />
@@ -95,11 +91,11 @@ export default function RatingList() {
               </div>
             </div>
           ))
-        ) : taxiparks.length > 0 ? (
-          taxiparks.map((park, i) => (
-            <TaxiParkCard
-              key={park.id}
-              taxipark={park}
+        ) : stores.length > 0 ? (
+          stores.map((store, i) => (
+            <StoreCard
+              key={store.id}
+              store={store}
               rank={i + 1}
             />
           ))
@@ -112,9 +108,9 @@ export default function RatingList() {
       </div>
 
       {/* Count info */}
-      {!loading && taxiparks.length > 0 && (
+      {!loading && stores.length > 0 && (
         <p className="text-muted text-center small mt-4">
-          Показано {taxiparks.length} таксопарков из рейтинга
+          Показано {stores.length} магазинов из рейтинга
         </p>
       )}
     </div>

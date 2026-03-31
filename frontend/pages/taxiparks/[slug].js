@@ -4,32 +4,41 @@ import LikeButton from '../../components/LikeButton';
 import CommentForm from '../../components/CommentForm';
 import Link from 'next/link';
 import { useState } from 'react';
-import { taxiparksAPI } from '../../lib/api';
+import { storesAPI } from '../../lib/api';
 
-export default function TaxiParkPage({ taxipark, error }) {
+export default function StorePage({ store, error }) {
   const router = useRouter();
-  const [comments, setComments] = useState(taxipark?.comments || []);
+  const [comments, setComments] = useState(store?.comments || []);
 
   if (router.isFallback) {
     return (
-      <Layout title="Загрузка...">
-        <div className="loading-overlay">
+      <Layout title="Загрузка..." description="">
+        <div className="container py-5 text-center">
           <div className="spinner-border text-warning" role="status">
             <span className="visually-hidden">Загрузка...</span>
           </div>
+          <p className="mt-3 text-muted">Загрузка данных магазина...</p>
         </div>
       </Layout>
     );
   }
 
-  if (error || !taxipark) {
+  if (error || !store) {
     return (
-      <Layout title="Страница не найдена">
+      <Layout
+        title="Магазин не найден"
+        description="Запрашиваемый магазин не найден"
+        canonical="https://lemanas.ru"
+      >
         <div className="container py-5 text-center">
           <div style={{ fontSize: '4rem' }}>😞</div>
-          <h1 className="mt-3">Таксопарк не найден</h1>
-          <p className="text-muted">Возможно, страница была удалена или перемещена.</p>
-          <Link href="/" className="btn btn-warning mt-3">На главную</Link>
+          <h1 className="fw-bold mb-3">Магазин не найден</h1>
+          <p className="text-muted mb-4">
+            Возможно, страница была удалена или перемещена.
+          </p>
+          <Link href="/" className="btn btn-warning btn-lg">
+            <i className="bi bi-house me-2"></i>На главную
+          </Link>
         </div>
       </Layout>
     );
@@ -40,52 +49,52 @@ export default function TaxiParkPage({ taxipark, error }) {
   };
 
   const features = [
-    taxipark.has_children_seat && { icon: '👶', label: 'Детское кресло' },
-    taxipark.has_animal_transport && { icon: '🐕', label: 'Перевозка животных' },
-    taxipark.has_cargo && { icon: '📦', label: 'Грузовые перевозки' },
-    taxipark.has_minivan && { icon: '🚐', label: 'Минивэн' },
+    store.has_delivery && { icon: '🚚', label: 'Доставка' },
+    store.has_installation && { icon: '🔧', label: 'Монтаж' },
+    store.has_warranty && { icon: '🛡️', label: 'Гарантия' },
+    store.has_credit && { icon: '💳', label: 'Кредит' },
   ].filter(Boolean);
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://taxorating.ru';
-  const canonical = `${siteUrl}/taxiparks/${taxipark.slug}`;
+  const siteUrl = 'https://lemanas.ru';
+  const canonical = `${siteUrl}/stores/${store.slug}`;
 
   const breadcrumbSchema = {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
     "itemListElement": [
       { "@type": "ListItem", "position": 1, "name": "Главная", "item": siteUrl },
-      { "@type": "ListItem", "position": 2, "name": "Рейтинг таксопарков", "item": `${siteUrl}/rating` },
-      { "@type": "ListItem", "position": 3, "name": taxipark.name, "item": canonical },
+      { "@type": "ListItem", "position": 2, "name": "Рейтинг магазинов", "item": `${siteUrl}/rating` },
+      { "@type": "ListItem", "position": 3, "name": store.name, "item": canonical },
     ],
   };
 
-  const combinedSchema = [taxipark.schema_org, breadcrumbSchema];
+  const combinedSchema = [store.schema_org, breadcrumbSchema].filter(Boolean);
 
   return (
     <Layout
-      title={taxipark.meta_title}
-      description={taxipark.meta_description}
+      title={store.meta_title}
+      description={store.meta_description}
       canonical={canonical}
       schema={combinedSchema}
     >
       {/* Breadcrumb */}
-      <div className="breadcrumb-section">
-        <div className="container">
-          <nav aria-label="breadcrumb">
-            <ol className="breadcrumb mb-0 small">
-              <li className="breadcrumb-item">
-                <Link href="/">Главная</Link>
-              </li>
-              <li className="breadcrumb-item">
-                <Link href="/rating">Рейтинг таксопарков</Link>
-              </li>
-              <li className="breadcrumb-item active" aria-current="page">
-                {taxipark.name}
-              </li>
-            </ol>
-          </nav>
-        </div>
-      </div>
+      <nav className="container py-3" aria-label="breadcrumb">
+        <ol className="breadcrumb mb-0">
+          <li className="breadcrumb-item">
+            <Link href="/" className="text-decoration-none">
+              <i className="bi bi-house me-1"></i>Главная
+            </Link>
+          </li>
+          <li className="breadcrumb-item">
+            <Link href="/rating" className="text-decoration-none">
+              Рейтинг магазинов
+            </Link>
+          </li>
+          <li className="breadcrumb-item active" aria-current="page">
+            {store.name}
+          </li>
+        </ol>
+      </nav>
 
       {/* Hero */}
       <div style={{ background: 'linear-gradient(135deg, #1a1a2e, #0f3460)', color: 'white' }} className="py-5">
@@ -96,15 +105,15 @@ export default function TaxiParkPage({ taxipark, error }) {
                 className="bg-white rounded-3 d-flex align-items-center justify-content-center"
                 style={{ width: 96, height: 96 }}
               >
-                {taxipark.logo ? (
+                {store.logo ? (
                   <img
-                    src={`${process.env.NEXT_PUBLIC_API_URL}${taxipark.logo}`}
-                    alt={taxipark.name}
+                    src={`${process.env.NEXT_PUBLIC_API_URL}${store.logo}`}
+                    alt={store.name}
                     className="rounded-3"
                     style={{ width: 88, height: 88, objectFit: 'cover' }}
                   />
                 ) : (
-                  <span style={{ fontSize: '3rem' }}>🚕</span>
+                  <span style={{ fontSize: '3rem' }}>🏪</span>
                 )}
               </div>
             </div>
@@ -112,23 +121,23 @@ export default function TaxiParkPage({ taxipark, error }) {
               <div className="d-flex flex-wrap gap-2 mb-2">
                 <span className="rating-badge">
                   <i className="bi bi-star-fill"></i>
-                  {Number(taxipark.rating).toFixed(1)}
+                  {Number(store.rating).toFixed(1)}
                 </span>
-                {taxipark.district && (
+                {store.district && (
                   <span className="badge bg-white bg-opacity-25">
                     <i className="bi bi-geo-alt-fill me-1"></i>
-                    {taxipark.district}, Москва
+                    {store.district}
                   </span>
                 )}
               </div>
-              <h1 className="fw-black fs-2 mb-2">{taxipark.name}</h1>
-              <p className="mb-0 opacity-75">{taxipark.short_description}</p>
+              <h1 className="fw-black fs-2 mb-2">{store.name}</h1>
+              <p className="mb-0 opacity-75">{store.short_description}</p>
             </div>
             <div className="col-auto d-none d-md-block">
               <LikeButton
-                slug={taxipark.slug}
-                initialLikes={taxipark.likes_count}
-                initialLiked={taxipark.user_liked}
+                slug={store.slug}
+                initialLikes={store.likes_count}
+                initialLiked={store.user_liked}
               />
             </div>
           </div>
@@ -140,23 +149,23 @@ export default function TaxiParkPage({ taxipark, error }) {
           {/* Main Content */}
           <div className="col-lg-8">
             {/* Stats */}
-            <div className="taxi-card mb-4">
+            <div className="store-card mb-4">
               <div className="row g-0 text-center">
                 <div className="col-4 stat-item border-end">
                   <div className="stat-value text-danger">
-                    {taxipark.likes_count?.toLocaleString('ru')}
+                    {store.likes_count?.toLocaleString('ru')}
                   </div>
                   <div className="stat-label">Лайков</div>
                 </div>
                 <div className="col-4 stat-item border-end">
                   <div className="stat-value text-primary">
-                    {taxipark.comments_count?.toLocaleString('ru')}
+                    {store.comments_count?.toLocaleString('ru')}
                   </div>
                   <div className="stat-label">Отзывов</div>
                 </div>
                 <div className="col-4 stat-item">
                   <div className="stat-value text-success">
-                    {taxipark.views_count?.toLocaleString('ru')}
+                    {store.views_count?.toLocaleString('ru')}
                   </div>
                   <div className="stat-label">Просмотров</div>
                 </div>
@@ -166,31 +175,31 @@ export default function TaxiParkPage({ taxipark, error }) {
             {/* Like Button Mobile */}
             <div className="d-md-none mb-4">
               <LikeButton
-                slug={taxipark.slug}
-                initialLikes={taxipark.likes_count}
-                initialLiked={taxipark.user_liked}
+                slug={store.slug}
+                initialLikes={store.likes_count}
+                initialLiked={store.user_liked}
               />
             </div>
 
             {/* Description */}
-            <div className="taxi-card p-4 mb-4">
+            <div className="store-card p-4 mb-4">
               <h2 className="h5 fw-bold mb-3">
                 <i className="bi bi-info-circle text-primary me-2"></i>
-                О таксопарке
+                О магазине
               </h2>
               <div
                 className="text-muted"
                 style={{ lineHeight: 1.8 }}
-                dangerouslySetInnerHTML={{ __html: taxipark.description.replace(/\n/g, '<br>') }}
+                dangerouslySetInnerHTML={{ __html: store.description.replace(/\n/g, '<br>') }}
               />
             </div>
 
             {/* Features */}
             {features.length > 0 && (
-              <div className="taxi-card p-4 mb-4">
+              <div className="store-card p-4 mb-4">
                 <h2 className="h5 fw-bold mb-3">
                   <i className="bi bi-check2-circle text-success me-2"></i>
-                  Возможности
+                  Услуги
                 </h2>
                 <div className="d-flex flex-wrap gap-2">
                   {features.map(f => (
@@ -203,8 +212,8 @@ export default function TaxiParkPage({ taxipark, error }) {
             )}
 
             {/* Map */}
-            {taxipark.latitude && taxipark.longitude && (
-              <div className="taxi-card p-4 mb-4">
+            {store.latitude && store.longitude && (
+              <div className="store-card p-4 mb-4">
                 <h2 className="h5 fw-bold mb-3">
                   <i className="bi bi-map text-info me-2"></i>
                   Местоположение
@@ -212,14 +221,14 @@ export default function TaxiParkPage({ taxipark, error }) {
                 <div className="map-placeholder">
                   <div className="text-center">
                     <i className="bi bi-geo-alt-fill fs-1 text-danger d-block mb-2"></i>
-                    <strong>{taxipark.address}</strong>
+                    <strong>{store.address}</strong>
                     <br />
                     <small className="text-muted">
-                      {taxipark.district && `${taxipark.district}, `}{taxipark.city}
+                      {store.district && `${store.district}, `}{store.city}
                     </small>
                     <br />
                     <a
-                      href={`https://maps.yandex.ru/?text=${encodeURIComponent(taxipark.address || taxipark.name + ' Москва')}`}
+                      href={`https://maps.yandex.ru/?text=${encodeURIComponent(store.address || store.name)}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="btn btn-sm btn-outline-primary mt-3"
@@ -229,16 +238,15 @@ export default function TaxiParkPage({ taxipark, error }) {
                     </a>
                   </div>
                 </div>
-                {/* Для реального GEO — мета-теги уже в head */}
                 <div className="mt-2 small text-muted">
                   <i className="bi bi-crosshair me-1"></i>
-                  Координаты: {taxipark.latitude}, {taxipark.longitude}
+                  Координаты: {store.latitude}, {store.longitude}
                 </div>
               </div>
             )}
 
             {/* Comments */}
-            <div className="taxi-card p-4 mb-4">
+            <div className="store-card p-4 mb-4">
               <h2 className="h5 fw-bold mb-4">
                 <i className="bi bi-chat-quote text-warning me-2"></i>
                 Отзывы ({comments.length})
@@ -286,7 +294,7 @@ export default function TaxiParkPage({ taxipark, error }) {
               )}
 
               <CommentForm
-                slug={taxipark.slug}
+                slug={store.slug}
                 onCommentAdded={handleCommentAdded}
               />
             </div>
@@ -295,76 +303,76 @@ export default function TaxiParkPage({ taxipark, error }) {
           {/* Sidebar */}
           <div className="col-lg-4">
             {/* Info Card */}
-            <div className="taxi-card p-4 mb-4 position-sticky" style={{ top: 20 }}>
+            <div className="store-card p-4 mb-4 position-sticky" style={{ top: 20 }}>
               <h3 className="h6 fw-bold mb-3 text-muted text-uppercase" style={{ letterSpacing: 1 }}>
                 Информация
               </h3>
 
               <ul className="list-unstyled">
-                {taxipark.phone && (
+                {store.phone && (
                   <li className="mb-3">
                     <div className="small text-muted mb-1">Телефон</div>
-                    <a href={`tel:${taxipark.phone}`} className="fw-semibold text-dark text-decoration-none">
+                    <a href={`tel:${store.phone}`} className="fw-semibold text-dark text-decoration-none">
                       <i className="bi bi-telephone-fill text-success me-2"></i>
-                      {taxipark.phone}
+                      {store.phone}
                     </a>
                   </li>
                 )}
 
-                {taxipark.website && (
+                {store.website && (
                   <li className="mb-3">
                     <div className="small text-muted mb-1">Сайт</div>
                     <a
-                      href={taxipark.website}
+                      href={store.website}
                       target="_blank"
                       rel="noopener noreferrer nofollow"
                       className="fw-semibold text-primary text-decoration-none"
                     >
                       <i className="bi bi-globe me-2"></i>
-                      {taxipark.website.replace(/https?:\/\//i, '').slice(0, 30)}
+                      {store.website.replace(/https?:\/\//i, '').slice(0, 30)}
                     </a>
                   </li>
                 )}
 
-                {taxipark.address && (
+                {store.address && (
                   <li className="mb-3">
                     <div className="small text-muted mb-1">Адрес</div>
                     <span className="fw-semibold">
                       <i className="bi bi-geo-alt-fill text-danger me-2"></i>
-                      {taxipark.address}
+                      {store.address}
                     </span>
                   </li>
                 )}
 
-                {taxipark.working_hours && (
+                {store.working_hours && (
                   <li className="mb-3">
                     <div className="small text-muted mb-1">Часы работы</div>
                     <span className="fw-semibold">
                       <i className="bi bi-clock-fill text-info me-2"></i>
-                      {taxipark.working_hours}
+                      {store.working_hours}
                     </span>
                   </li>
                 )}
               </ul>
 
               {/* Pricing */}
-              {(taxipark.min_price || taxipark.price_per_km) && (
+              {(store.min_price || store.price_range) && (
                 <>
                   <hr />
                   <h3 className="h6 fw-bold mb-3 text-muted text-uppercase" style={{ letterSpacing: 1 }}>
-                    Тарифы
+                    Цены
                   </h3>
                   <div className="d-flex flex-column gap-2">
-                    {taxipark.min_price && (
+                    {store.min_price && (
                       <div className="d-flex justify-content-between align-items-center">
-                        <span className="small text-muted">Минимальная стоимость</span>
-                        <span className="badge bg-success fs-6">от {taxipark.min_price} ₽</span>
+                        <span className="small text-muted">Минимальная цена</span>
+                        <span className="badge bg-success fs-6">от {store.min_price} ₽</span>
                       </div>
                     )}
-                    {taxipark.price_per_km && (
+                    {store.price_range && (
                       <div className="d-flex justify-content-between align-items-center">
-                        <span className="small text-muted">Цена за км</span>
-                        <span className="badge bg-primary fs-6">{taxipark.price_per_km} ₽/км</span>
+                        <span className="small text-muted">Ценовой диапазон</span>
+                        <span className="badge bg-primary fs-6">{store.price_range}</span>
                       </div>
                     )}
                   </div>
@@ -372,9 +380,9 @@ export default function TaxiParkPage({ taxipark, error }) {
               )}
 
               {/* CTA */}
-              {taxipark.website && (
+              {store.website && (
                 <a
-                  href={taxipark.website}
+                  href={store.website}
                   target="_blank"
                   rel="noopener noreferrer nofollow"
                   className="btn btn-warning w-100 fw-bold mt-4"
@@ -384,9 +392,9 @@ export default function TaxiParkPage({ taxipark, error }) {
                 </a>
               )}
 
-              {taxipark.phone && (
+              {store.phone && (
                 <a
-                  href={`tel:${taxipark.phone}`}
+                  href={`tel:${store.phone}`}
                   className="btn btn-outline-success w-100 fw-bold mt-2"
                 >
                   <i className="bi bi-telephone me-2"></i>
@@ -403,10 +411,10 @@ export default function TaxiParkPage({ taxipark, error }) {
 
 export async function getServerSideProps({ params }) {
   try {
-    const res = await taxiparksAPI.getDetail(params.slug);
+    const res = await storesAPI.getDetail(params.slug);
     return {
       props: {
-        taxipark: res.data,
+        store: res.data,
       },
     };
   } catch (err) {
@@ -415,7 +423,7 @@ export async function getServerSideProps({ params }) {
     }
     return {
       props: {
-        taxipark: null,
+        store: null,
         error: 'Ошибка загрузки данных',
       },
     };

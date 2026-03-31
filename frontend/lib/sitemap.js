@@ -1,4 +1,4 @@
-export const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://reyting-taksoparkov-moskvy.ru';
+export const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://lemanas.ru';
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 export const staticPages = [

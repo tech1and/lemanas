@@ -3,24 +3,35 @@ import Link from 'next/link';
 import { blogAPI } from '../../lib/api';
 
 export default function BlogPage({ posts, categories }) {
+  const blogSchema = {
+    "@context": "https://schema.org",
+    "@type": "Blog",
+    "name": "Блог — Рейтинг магазинов Лемана Про",
+    "url": "https://lemanas.ru/blog",
+    "description": "Полезные статьи, советы и актуальные рейтинги магазинов Лемана Про",
+  };
+
   return (
     <Layout
-      title="Блог о такси в Москве — советы и рейтинги"
-      description="Полезные статьи о такси в Москве: советы, рейтинги, лайфхаки и актуальные новости."
+      title="Блог — Рейтинг магазинов Лемана Про"
+      description="Полезные статьи, советы и актуальные рейтинги магазинов Лемана Про. Читайте о выборе товаров, ремонте и обустройстве дома."
+      canonical="https://lemanas.ru/blog"
+      schema={blogSchema}
     >
-      <div className="hero-section py-5">
-        <div className="container">
-          <h1 className="fw-black text-white">
-            <i className="bi bi-journal-text text-warning me-3"></i>
-            Блог о такси в Москве
-          </h1>
-          <p className="lead text-white-50">
-            Полезные статьи, советы и актуальные рейтинги
-          </p>
-        </div>
-      </div>
-
       <div className="container py-5">
+        {/* Header */}
+        <div className="row mb-4">
+          <div className="col-lg-8">
+            <span className="badge bg-warning text-dark mb-3">📰 Блог</span>
+            <h1 className="display-5 fw-bold mb-3">
+              Блог о магазинах Лемана Про
+            </h1>
+            <p className="lead text-muted mb-0">
+              Полезные статьи, советы и актуальные рейтинги для покупателей
+            </p>
+          </div>
+        </div>
+
         {/* Categories */}
         {categories && categories.length > 0 && (
           <div className="d-flex flex-wrap gap-2 mb-4">
@@ -36,7 +47,7 @@ export default function BlogPage({ posts, categories }) {
         <div className="row g-4">
           {posts.map(post => (
             <div key={post.id} className="col-md-6 col-lg-4">
-              <div className="taxi-card blog-card h-100">
+              <div className="store-card blog-card h-100">
                 {post.image ? (
                   <img
                     src={`${process.env.NEXT_PUBLIC_API_URL}${post.image}`}
@@ -49,7 +60,7 @@ export default function BlogPage({ posts, categories }) {
                     className="d-flex align-items-center justify-content-center bg-light"
                     style={{ height: 200, fontSize: '4rem' }}
                   >
-                    🚗
+                    🏪
                   </div>
                 )}
                 <div className="card-body p-4">
@@ -104,7 +115,6 @@ export async function getServerSideProps() {
       blogAPI.getPosts(),
       blogAPI.getCategories(),
     ]);
-
     return {
       props: {
         posts: postsRes.data.results || postsRes.data,

@@ -1,12 +1,10 @@
 // pages/sitemap.js
 import Head from 'next/head';
-
-const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://reyting-taksoparkov-moskvy.ru';
+const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://lemanas.ru';
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-
 const staticPages = [
   { path: '/', label: '🏠 Главная' },
-  { path: '/rating', label: '📊 Рейтинг таксопарков' },
+  { path: '/rating', label: '📊 Рейтинг магазинов' },
   { path: '/blog', label: '📰 Блог' },
   { path: '/about', label: 'ℹ️ О нас' },
   { path: '/privacy', label: '🔒 Политика конфиденциальности' },
@@ -17,20 +15,19 @@ export async function getStaticProps() {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000);
-
-    const [taxiparksRes, blogRes] = await Promise.all([
-      fetch(`${API_URL}/api/taxiparks/?limit=50`, { signal: controller.signal }),
+    const [storesRes, blogRes] = await Promise.all([
+      fetch(`${API_URL}/api/stores/?limit=50`, { signal: controller.signal }),
       fetch(`${API_URL}/api/blog/posts/?limit=30`, { signal: controller.signal }),
     ]);
 
     clearTimeout(timeout);
 
-    const taxiparksData = await taxiparksRes.json();
+    const storesData = await storesRes.json();
     const blogData = await blogRes.json();
 
     return {
       props: {
-        taxiparks: taxiparksData.results || taxiparksData || [],
+        stores: storesData.results || storesData || [],
         posts: blogData.results || blogData || [],
       },
       revalidate: 3600,
@@ -38,18 +35,17 @@ export async function getStaticProps() {
   } catch (error) {
     console.error('Sitemap page fetch error:', error);
     // Возвращаем пустые данные, но страница отрендерится
-    return { props: { taxiparks: [], posts: [] }, revalidate: 3600 };
+    return { props: { stores: [], posts: [] }, revalidate: 3600 };
   }
 }
 
-export default function SitemapPage({ taxiparks, posts }) {
+export default function SitemapPage({ stores, posts }) {
   return (
     <>
       <Head>
-        <title>Карта сайта | Рейтинг таксопарков Москвы</title>
-        <meta name="description" content="Полная карта сайта для удобной навигации" />
+        <title>Карта сайта | Рейтинг магазинов Лемана Про</title>
+        <meta name="description" content="Карта сайта рейтинга магазинов Лемана Про. Все разделы и страницы." />
       </Head>
-
       <main className="container py-5">
         <h1 className="mb-4">🗺️ Карта сайта</h1>
 
@@ -65,24 +61,24 @@ export default function SitemapPage({ taxiparks, posts }) {
           </ul>
         </section>
 
-        {/* Таксопарки */}
+        {/* Магазины */}
         <section className="mb-5">
-          <h2 className="h4 mb-3">🚕 Таксопарки ({taxiparks.length})</h2>
-          {taxiparks.length > 0 ? (
+          <h2 className="h4 mb-3">🏪 Магазины Лемана Про ({stores.length})</h2>
+          {stores.length > 0 ? (
             <ul className="list-unstyled">
-              {taxiparks.slice(0, 30).map((park) => (
-                <li key={park.id} className="mb-1">
-                  <a href={`/taxiparks/${park.slug}`} className="text-decoration-none">
-                    {park.name}
+              {stores.slice(0, 30).map((store) => (
+                <li key={store.id} className="mb-1">
+                  <a href={`/stores/${store.slug}`} className="text-decoration-none">
+                    {store.name}
                   </a>
                 </li>
               ))}
-              {taxiparks.length > 30 && (
-                <li><a href="/rating" className="text-muted">→ Все таксопарки</a></li>
+              {stores.length > 30 && (
+                <li><a href="/rating" className="text-muted">→ Все магазины</a></li>
               )}
             </ul>
           ) : (
-            <p className="text-muted">Не удалось загрузить список таксопарков</p>
+            <p className="text-muted">Не удалось загрузить список магазинов</p>
           )}
         </section>
 

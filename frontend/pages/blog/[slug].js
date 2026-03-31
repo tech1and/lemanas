@@ -3,18 +3,8 @@ import Link from 'next/link';
 import { blogAPI } from '../../lib/api';
 
 export default function BlogPostPage({ post, error }) {
-  if (error || !post) {
-    return (
-      <Layout title="Статья не найдена">
-        <div className="container py-5 text-center">
-          <h1>Статья не найдена</h1>
-          <Link href="/blog" className="btn btn-warning mt-3">В блог</Link>
-        </div>
-      </Layout>
-    );
-  }
+  const siteUrl = 'https://lemanas.ru';
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || '';
   const articleSchema = {
     "@context": "https://schema.org",
     "@type": "Article",
@@ -24,10 +14,30 @@ export default function BlogPostPage({ post, error }) {
     "dateModified": post.updated_at,
     "publisher": {
       "@type": "Organization",
-      "name": "ТаксоРейтинг Москвы",
+      "name": "Рейтинг магазинов Лемана Про",
       "url": siteUrl,
     },
   };
+
+  if (error || !post) {
+    return (
+      <Layout
+        title="Статья не найдена"
+        description="Запрашиваемая статья не найдена"
+        canonical={siteUrl}
+      >
+        <div className="container py-5 text-center">
+          <h1 className="display-4 fw-bold mb-3">Статья не найдена</h1>
+          <p className="text-muted mb-4">
+            К сожалению, запрашиваемая статья не найдена или была удалена.
+          </p>
+          <Link href="/blog" className="btn btn-warning btn-lg">
+            <i className="bi bi-arrow-left me-2"></i>В блог
+          </Link>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout
@@ -37,17 +47,23 @@ export default function BlogPostPage({ post, error }) {
       schema={articleSchema}
     >
       {/* Breadcrumb */}
-      <div className="breadcrumb-section">
-        <div className="container">
-          <nav aria-label="breadcrumb">
-            <ol className="breadcrumb mb-0 small">
-              <li className="breadcrumb-item"><Link href="/">Главная</Link></li>
-              <li className="breadcrumb-item"><Link href="/blog">Блог</Link></li>
-              <li className="breadcrumb-item active">{post.title.slice(0, 40)}...</li>
-            </ol>
-          </nav>
-        </div>
-      </div>
+      <nav className="container py-3" aria-label="breadcrumb">
+        <ol className="breadcrumb mb-0">
+          <li className="breadcrumb-item">
+            <Link href="/" className="text-decoration-none">
+              <i className="bi bi-house me-1"></i>Главная
+            </Link>
+          </li>
+          <li className="breadcrumb-item">
+            <Link href="/blog" className="text-decoration-none">
+              Блог
+            </Link>
+          </li>
+          <li className="breadcrumb-item active" aria-current="page">
+            {post.title.slice(0, 40)}...
+          </li>
+        </ol>
+      </nav>
 
       <div className="container py-5">
         <div className="row">
@@ -64,7 +80,9 @@ export default function BlogPostPage({ post, error }) {
               <span>
                 <i className="bi bi-calendar3 me-1"></i>
                 {new Date(post.created_at).toLocaleDateString('ru-RU', {
-                  year: 'numeric', month: 'long', day: 'numeric'
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
                 })}
               </span>
               <span>
