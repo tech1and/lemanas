@@ -8,6 +8,6 @@ Disallow: /static/
 Disallow: /*?*sort_by=
 Disallow: /*?*page=
 
-Sitemap: https://reyting-taksoparkov-moskvy.ru/sitemap.xml
+Sitemap: https://lemanas.ru/sitemap.xml
 
 Crawl-delay: 1

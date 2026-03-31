@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-# ── Цвета ──────────────────────────────────────
+# ── Цвета и утилиты ──────────────────────────────
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
 BLUE='\033[0;34m'; CYAN='\033[0;36m'; NC='\033[0m'
 
@@ -193,7 +193,7 @@ ADMIN_EMAIL=${ADMIN_EMAIL}
 ENV
 ok ".env создан"
 
-# ── Backend: валидация структуры ─────────────
+# ── Backend: валидация структуры ───────────────
 step "Валидация структуры проекта"
 cd "$PROJECT_DIR/backend"
 
@@ -201,7 +201,6 @@ cd "$PROJECT_DIR/backend"
 for file in \
     "apps/__init__.py" \
     "apps/taxiparks/__init__.py" \
-    "apps/taxiparks/management/commands/__init__.py" \
     "apps/blog/__init__.py" \
     "config/settings.py" \
     "manage.py"
@@ -209,14 +208,19 @@ do
     [ -f "$file" ] || die "Отсутствует критичный файл: $file"
 done
 
-# Проверяем директории
-for dir in \
-    "apps/taxiparks/management/commands" \
-    "apps/blog/management/commands" \
-    "staticfiles" \
-    "media"
+# Создаём директории, если нет
+mkdir -p "apps/taxiparks/management/commands"
+mkdir -p "apps/blog/management/commands"
+mkdir -p "staticfiles" "media"
+
+# Создаём __init__.py только если файла нет (идемпотентно)
+for init_file in \
+    "apps/taxiparks/management/__init__.py" \
+    "apps/taxiparks/management/commands/__init__.py" \
+    "apps/blog/management/__init__.py" \
+    "apps/blog/management/commands/__init__.py"
 do
-    [ -d "$dir" ] || die "Отсутствует директория: $dir"
+    [ -f "$init_file" ] || touch "$init_file"
 done
 
 ok "Структура проекта валидна"
@@ -262,7 +266,7 @@ if [ ! -f "package.json" ]; then
     die "package.json не найден в frontend/"
 fi
 
-# Создаём next.config.js с standalone
+# Создаём next.config.js с standalone (ИСПРАВЛЕНО)
 cat > next.config.js << 'NEXTCFG'
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -310,7 +314,7 @@ ok "Next.js собран"
 # ── Supervisor ─────────────────────────────────
 step "Supervisor (управление процессами)"
 
-# Конфиг для Gunicorn (Django) - ИСПРАВЛЕНО
+# Конфиг для Gunicorn (Django) - ИСПРАВЛЕНО: одна строка + env без переносов
 cat > /etc/supervisor/conf.d/taxi-backend.conf << SUPBACK
 [program:taxi-backend]
 command=${PROJECT_DIR}/venv/bin/gunicorn config.wsgi:application --bind 127.0.0.1:8000 --workers 3 --timeout 120 --keep-alive 5 --log-level info
@@ -326,7 +330,7 @@ stdout_logfile_backups=3
 environment=DJANGO_SETTINGS_MODULE="config.settings",PYTHONPATH="${PROJECT_DIR}/backend",HOME="/var/www",PATH="${PROJECT_DIR}/venv/bin:/usr/bin:/bin"
 SUPBACK
 
-# Конфиг для Next.js
+# Конфиг для Next.js - ИСПРАВЛЕНО: env без переносов
 cat > /etc/supervisor/conf.d/taxi-frontend.conf << SUPFRONT
 [program:taxi-frontend]
 command=node ${PROJECT_DIR}/frontend/.next/standalone/server.js
@@ -367,7 +371,7 @@ ok "Supervisor настроен"
 # ── Nginx конфигурация ─────────────────────────
 step "Nginx конфигурация"
 
-# limit_req_zone должен быть в http контексте
+# ИСПРАВЛЕНО: limit_req_zone переносим в http-контекст
 if ! grep -q "limit_req_zone.*api:10m" /etc/nginx/nginx.conf; then
     sed -i '/http {/a\    limit_req_zone \$binary_remote_addr zone=api:10m rate=60r/m;' /etc/nginx/nginx.conf
 fi
@@ -412,7 +416,7 @@ server {
         proxy_read_timeout    30s;
     }
 
-    # Django REST API
+    # Django REST API - limit_req без _zone
     location /api/ {
         limit_req zone=api burst=30 nodelay;
         proxy_pass         http://127.0.0.1:8000;
@@ -450,7 +454,7 @@ ok "Nginx настроен"
 
 # ── Файрвол ────────────────────────────────────
 step "UFW файрвол"
-# НЕ сбрасываем UFW полностью - опасно для SSH
+# ИСПРАВЛЕНО: не сбрасываем UFW полностью (риск блокировки)
 ufw default deny incoming 2>/dev/null || true
 ufw default allow outgoing 2>/dev/null || true
 ufw allow 22/tcp 2>/dev/null || true
@@ -479,7 +483,6 @@ if [ "$IS_IP" = false ] && [ "$DOMAIN" != "localhost" ]; then
 
         # Обновляем Next.js .env.local на HTTPS
         sed -i "s|http://${DOMAIN}|https://${DOMAIN}|g" "$PROJECT_DIR/frontend/.env.local"
-
         # Обновляем backend .env
         sed -i "s|http://${DOMAIN}|https://${DOMAIN}|g" "$PROJECT_DIR/backend/.env"
 
