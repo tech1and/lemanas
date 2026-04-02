@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { taxiparksAPI } from '../lib/api';
+import { storesAPI } from '../lib/api';
 
 export default function LikeButton({ slug, initialLikes, initialLiked }) {
   const [likesCount, setLikesCount] = useState(initialLikes || 0);
@@ -13,7 +13,7 @@ export default function LikeButton({ slug, initialLikes, initialLiked }) {
     setAnimating(true);
 
     try {
-      const res = await taxiparksAPI.like(slug);
+      const res = await storesAPI.like(slug);
       setLikesCount(res.data.likes_count);
       setLiked(res.data.liked);
     } catch (err) {

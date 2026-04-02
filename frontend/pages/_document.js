@@ -14,7 +14,7 @@ export default function Document() {
         <link rel="manifest" href="/site.webmanifest" />
         <meta name="theme-color" content="#ffffff" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-title" content="Такси Рейтинг" />
+        <meta name="apple-mobile-web-app-title" content="Рейтинг Лемана Про" />
         {process.env.NEXT_PUBLIC_BING_VERIFICATION && (
 			<meta
             name="msvalidate.01"

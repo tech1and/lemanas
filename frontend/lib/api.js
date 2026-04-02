@@ -51,18 +51,18 @@ api.interceptors.response.use(
   }
 );
 
-export const taxiparksAPI = {
+export const storesAPI = {
   getList: (params = {}) =>
-    api.get('/api/taxiparks/', { params }),
+    api.get('/api/stores/', { params }),
   
   getDetail: (slug) =>
-    api.get(`/api/taxiparks/${slug}/`),
+    api.get(`/api/stores/${slug}/`),
   
   like: (slug) =>
-    api.post(`/api/taxiparks/${slug}/like/`), // Теперь будет с CSRF-токеном!
+    api.post(`/api/stores/${slug}/like/`), // Теперь будет с CSRF-токеном!
   
   addComment: (slug, data) =>
-    api.post(`/api/taxiparks/${slug}/comment/`, data),
+    api.post(`/api/stores/${slug}/comment/`, data),
 };
 
 export const blogAPI = {

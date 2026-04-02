@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { taxiparksAPI } from '../lib/api';
+import { storesAPI } from '../lib/api';
 
 export default function CommentForm({ slug, onCommentAdded }) {
   const [formData, setFormData] = useState({

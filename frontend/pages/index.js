@@ -1,7 +1,7 @@
 import Layout from '../components/Layout';
 import RatingList from '../components/RatingList';
 import Link from 'next/link';
-import { taxiparksAPI, blogAPI } from '../lib/api';
+import { storesAPI, blogAPI } from '../lib/api';
 
 export default function HomePage({ topTaxiparks, latestPosts, stats }) {
   const homeSchema = {
